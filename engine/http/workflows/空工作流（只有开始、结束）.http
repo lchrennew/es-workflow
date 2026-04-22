@@ -1,0 +1,25 @@
+@host=http://localhost:10001
+
+### 空流程 直接运行结束
+POST /run/start
+Host: {{host}}
+Content-Type: application/x-yaml
+
+config:
+    kind: workflow
+    name: demo/empty
+    metadata:
+      title: 空工作流
+    spec:
+      states:
+        - name: initial
+          title: 开始
+          transitions:
+            - event: start
+              emitter: always
+              targets:
+                - state: end
+                  prefetchers: []
+        - name: end
+          title: 结束
+inputParameters: []

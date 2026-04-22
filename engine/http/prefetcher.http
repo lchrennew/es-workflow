@@ -1,0 +1,25 @@
+@host=http://localhost:10001
+
+### 新建prefetcher
+POST /prefetchers/
+Host: {{host}}
+Content-Type: application/x-yaml
+
+kind: prefetcher
+name: demo/request-targets
+metadata:
+  title: 生成请求目标列表
+  tags:
+    - demo/example
+spec:
+  script: |
+    // 注意：这里仅填写 content，会被运行时包装进：
+    // async (run, task, target, parameters, api) => { const result = {}; ...; return result }
+    //
+    // 参数命名规则：大写/数字/下划线，且不以_结尾；值为字符串
+    // TMP_ 前缀参数：任务结束后不输出、不后传（适合作为预取临时上下文）
+
+    // 最简示例：直接指定一个处理方
+    result["TMP_REQUEST_TARGETS"] = "user:10086";
+
+###

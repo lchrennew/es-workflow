@@ -1,0 +1,37 @@
+@host=http://localhost:10001
+
+### 单状态工作流（只有一个用户定义的状态）
+POST /run/start
+Host: {{host}}
+Content-Type: application/x-yaml
+
+config:
+  kind: workflow
+  name: demo/single
+  metadata:
+    title: 单状态工作流
+  spec:
+    states:
+      - name: initial
+        title: 开始
+        transitions:
+          - event: start
+            targets:
+              - state: review
+                prefetchers: [ demo/request-targets ]
+      - name: review
+        title: 审核
+        emitter: demo/approval
+        emitterRules: [ veto, any-accept ]
+        transitions:
+          - event: passed
+            targets:
+              - state: end
+                prefetchers: [ ]
+          - event: rejected
+            targets:
+              - state: end
+                prefetchers: [ ]
+      - name: end
+        title: 结束
+inputParameters: [ ]

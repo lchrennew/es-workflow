@@ -1,0 +1,17 @@
+@host=http://localhost:10001
+
+### 新建emitter-rule
+POST /emitter-rules/
+Host: {{host}}
+Content-Type: application/x-yaml
+
+kind: emitter-rule
+name: demo/approval/any-accept
+metadata:
+  title: 任一通过即通过
+spec:
+  script: |
+    // 任意人通过即通过
+    const responses = (task.requests ?? []).map(r => r?.response).filter(Boolean);
+    if (responses.some(r => r.action === "ACCEPT")) event.name = "passed";
+###

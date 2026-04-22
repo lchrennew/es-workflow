@@ -1,0 +1,18 @@
+@host=http://localhost:10001
+
+### 新建emitter
+POST /emitters/
+Host: {{host}}
+Content-Type: application/x-yaml
+
+kind: workflow-transition-emitter
+name: demo/approval
+metadata:
+  title: 审批场景 emitter
+spec:
+  allowedActions:
+    - action: ACCEPT
+      title: 通过
+    - action: REFUSE
+      title: 拒绝
+###

@@ -1,0 +1,1 @@
+export const staticClone = object => JSON.parse(JSON.stringify(object ?? null))

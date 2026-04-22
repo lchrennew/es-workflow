@@ -1,0 +1,50 @@
+@host=http://localhost:10001
+
+### 两个状态顺序工作流
+POST /run/start
+Host: {{host}}
+Content-Type: application/x-yaml
+
+config:
+  kind: workflow
+  name: demo/two-seq
+  metadata:
+    title: 两状态顺序
+  spec:
+    states:
+      - name: initial
+        title: 开始
+        transitions:
+          - event: start
+            targets:
+              - state: a
+                prefetchers: [ demo/request-targets ]
+      - name: a
+        title: 状态A
+        emitter: demo/approval
+        emitterRules: [ veto, any-accept ]
+        transitions:
+          - event: passed
+            targets:
+              - state: b
+                prefetchers: [ demo/request-targets ]
+          - event: rejected
+            targets:
+              - state: end
+                prefetchers: [ ]
+      - name: b
+        title: 状态B
+        emitter: demo/approval
+        emitterRules: [ veto, any-accept ]
+        transitions:
+          - event: passed
+            targets:
+              - state: end
+                prefetchers: [ ]
+          - event: rejected
+            targets:
+              - state: end
+                prefetchers: [ ]
+      - name: end
+        title: 结束
+inputParameters: [ ]

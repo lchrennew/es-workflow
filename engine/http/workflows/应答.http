@@ -1,0 +1,14 @@
+@host=http://localhost:10001
+
+### 应答
+POST /run/respond
+Host: {{host}}
+Content-Type: application/json
+
+{
+  "run": "demo.single.69e8a1668b8c93f1356f170d",
+  "task": "69e8a1668b8c9375fe6f170f",
+  "request": "69e8a1668b8c93ffa56f1710",
+  "action": "ACCEPT",
+  "payload": "不错"
+}
