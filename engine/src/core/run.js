@@ -23,14 +23,25 @@ const strategies = {
 
     running: async run => {
         logger.info('运行状态机...运行中');
-        const ending = run.tasks.find(task => task.stateName === 'end');
+        const end = run.tasks.find(task => task.stateName === 'end' && task.status === 'in-progress');
+
+        const ending = end
+            && run.tasks.every(task => task.stateName === 'end' || task.status !== 'in-progress');
         if (ending) {
             logger.info('运行状态机...已确定将结束');
-            ending.status = 'completed'
+            end.status = 'completed'
             logger.info('运行状态机...任务状态结束');
             run.status = 'completed'
             logger.info('运行状态机...运行状态结束');
             dumpOutputParameters(run)
+            logger.info('运行状态机...运行输出参数就位');
+            await saveRun(run)
+            logger.info('运行状态机...运行已保存');
+        } else if (end) {
+            logger.info('运行状态机...不满足结束条件');
+            end.status = 'ignored'
+            logger.info('运行状态机...任务状态忽略');
+            dumpOutputParameters(end)
             logger.info('运行状态机...运行输出参数就位');
             await saveRun(run)
             logger.info('运行状态机...运行已保存');

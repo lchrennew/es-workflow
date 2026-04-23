@@ -19,10 +19,6 @@ export const executeEmitter = async (state, { run, task, request, parameters, ap
             return emitRunEvent(run, task, event.name, {})
         }
     }
-
-    const { prefetch } = await importNamespace(exportName('emit', script));
-
-    return prefetch(staticClone(run), staticClone(task), staticClone(target), staticClone(parameters), api);
 }
 
 export const saveEmitterRule = rule => redis.set(`emitter-rule:${ rule.name }`, YAML.stringify(rule));
