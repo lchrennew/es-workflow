@@ -1,6 +1,6 @@
 <template>
   <a-modal title="配置预览 (YAML)" :open="visible" @cancel="close" width="600px" :footer="null"
-    :bodyStyle="{ padding: '15px' }">
+    :bodyStyle="{ padding: 0 }">
     <div class="yaml-content">
       <a-textarea readonly :value="yamlContent" :rows="20" />
     </div>
@@ -12,6 +12,7 @@ import { computed } from 'vue';
 import { Modal as AModal, Textarea as ATextarea } from 'ant-design-vue';
 import { stringify } from 'yaml';
 import { workflow, getCleanWorkflow } from '../../composables/use-workflow.js';
+
 
 const props = defineProps({ visible: Boolean });
 const emit = defineEmits(['update:visible']);

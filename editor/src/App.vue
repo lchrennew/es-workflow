@@ -1,55 +1,52 @@
 <template>
-  <workflow-editor v-model:value="workflowYaml" :fetchEmitters="mockFetchEmitters" />
+  <div class="app-container">
+    <div class="panel editor-panel">
+      <workflow-editor v-model:value="workflowYaml" :fetchEmitters="mockFetchEmitters"
+        :fetchEmitterRules="mockFetchEmitterRules" :fetchPrefetchers="mockFetchPrefetchers" />
+    </div>
+    <div class="panel viewer-panel">
+      <workflow-run-viewer v-if="mockWorkflowRun.config" :workflowRun="mockWorkflowRun"
+        :fetchEmitters="mockFetchEmitters" />
+      <div v-else class="empty-viewer">
+        暂无有效的工作流配置
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup>
-import { ref } from 'vue';
 import WorkflowEditor from './components/editor/workflow-editor.vue';
-
-// 绑定的 yaml 数据
-const workflowYaml = ref('');
+import WorkflowRunViewer from './components/editor/workflow-run-viewer.vue';
+import { mockedEmitters } from "./mocked-emitters.js";
+import { mockedEmitterRules } from "./mocked-emitter-rules.js";
+import { mockedPrefetchers } from "./mocked-prefetchers.js";
+import { workflowYaml } from "./mocked-workflow.js";
+import { mockWorkflowRun } from "./mocked-workflow-run.js";
 
 // 模拟的异步拉取 emitters 方法
-const mockFetchEmitters = async () => {
-  return new Promise((resolve) => {
+const mockFetchEmitters = async () =>
+  new Promise((resolve) => {
     setTimeout(() => {
-      resolve([
-        {
-          kind: 'workflow-transition-emitter',
-          name: 'demo/approval',
-          metadata: {
-            title: '审批场景 emitter (来自远程)',
-            forUserState: true
-          },
-          spec: {
-            allowedActions: [
-              { action: 'ACCEPT', title: '通过' },
-              { action: 'REFUSE', title: '拒绝' }
-            ],
-            allowedEvents: [
-              { name: 'passed', title: '通过' },
-              { name: 'rejected', title: '拒绝' }
-            ]
-          }
-        },
-        {
-          kind: 'workflow-transition-emitter',
-          name: 'system/start',
-          metadata: {
-            title: '开始节点 emitter',
-            forUserState: false
-          },
-          spec: {
-            allowedActions: [],
-            allowedEvents: [
-              { name: 'start', title: '启动' }
-            ]
-          }
-        }
-      ]);
+      resolve(mockedEmitters);
     }, 500);
   });
-};
+
+
+// 模拟的异步拉取 emitter rules 方法
+const mockFetchEmitterRules = async () =>
+  new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(mockedEmitterRules);
+    }, 500);
+  });
+// 模拟的异步拉取 prefetchers 方法
+const mockFetchPrefetchers = async () =>
+  new Promise((resolve) => {
+    setTimeout(() => {
+
+      resolve(mockedPrefetchers);
+    }, 500);
+  });
 </script>
 
 <style lang="less">
@@ -63,6 +60,35 @@ body {
 }
 
 #app {
-  height: 100vh;
+  height: 600px;
+}
+
+.app-container {
+  display: flex;
+  height: 100%;
+  width: 100%;
+}
+
+.panel {
+  flex: 1;
+  height: 100%;
+  overflow: hidden;
+}
+
+.editor-panel {
+  border: 1px solid #ddd;
+}
+
+.viewer-panel {
+  background-color: #fafafa;
+}
+
+.empty-viewer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  color: #999;
+  font-size: 14px;
 }
 </style>

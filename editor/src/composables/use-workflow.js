@@ -10,8 +10,56 @@ export const workflow = reactive({
 export const selection = reactive({
   type: null, // 'node' | 'edge' | null
   data: null,
-  parent: null // Used for edges to find the source state
+  parent: null, // Used for edges to find the source state
+  showPanel: false // Controls property panel visibility
 });
+
+export const WORKFLOW_SELECTION_KEY = Symbol('workflow-selection');
+
+export const createSelectionState = () => {
+  const localSelection = reactive({
+    type: null,
+    data: null,
+    parent: null,
+    showPanel: false
+  });
+
+  const localSelectNode = (node) => {
+    localSelection.type = 'node';
+    localSelection.data = node;
+    localSelection.parent = null;
+    localSelection.showPanel = false;
+  };
+
+  const localSelectTransition = (transition, sourceState) => {
+    localSelection.type = 'transition';
+    localSelection.data = transition;
+    localSelection.parent = sourceState;
+    localSelection.showPanel = false;
+  };
+
+  const localSelectTargetEdge = (transition, targetState, sourceState) => {
+    localSelection.type = 'target-edge';
+    localSelection.data = { transition, targetState };
+    localSelection.parent = sourceState;
+    localSelection.showPanel = false;
+  };
+
+  const localClearSelection = () => {
+    localSelection.type = null;
+    localSelection.data = null;
+    localSelection.parent = null;
+    localSelection.showPanel = false;
+  };
+
+  return {
+    selection: localSelection,
+    selectNode: localSelectNode,
+    selectTransition: localSelectTransition,
+    selectTargetEdge: localSelectTargetEdge,
+    clearSelection: localClearSelection
+  };
+};
 
 export const drawing = reactive({
   isDrawing: false,
@@ -111,30 +159,28 @@ export const loadWorkflow = (data) => {
     const states = data.spec.states.map((state, index) => {
       let ui = layout.states?.[state.name];
       if (!ui) {
-        // 简单分配默认坐标
-        ui = state.ui || { x: 100 + (index % 3) * 200, y: 100 + Math.floor(index / 3) * 150 };
         if (state.name === 'initial') {
-          ui.x = 350; ui.y = 50;
+          ui = { x: 350, y: 50 };
         } else if (state.name === 'end') {
-          ui.x = 350; ui.y = 350;
+          ui = { x: 350, y: 350 };
         }
       }
       return {
         ...state,
-        ui: { ...ui }
+        ui: ui ? { ...ui } : undefined
       };
     });
 
-    // 给 transitions 恢复或分配默认 UI 坐标以防出错
+    // 给 transitions 恢复 UI 坐标
     states.forEach(state => {
       if (state.transitions) {
         state.transitions.forEach(t => {
           let tUi = layout.transitions?.[`${state.name}::${t.event}`];
-          if (!tUi) {
-            // 事件节点坐标相对于状态节点往下偏移
-            tUi = t.ui || { x: state.ui.x, y: state.ui.y + 100 };
+          if (tUi) {
+            t.ui = { ...tUi };
+          } else {
+            delete t.ui;
           }
-          t.ui = { ...tUi };
         });
       } else {
         state.transitions = [];
@@ -146,12 +192,6 @@ export const loadWorkflow = (data) => {
     delete workflow.spec.layout;
 
     reorderStates();
-
-    if (!hasLayout) {
-      import('./workflow-ops.js').then(module => {
-        module.performAutoLayout();
-      });
-    }
   }
 };
 
@@ -164,16 +204,26 @@ export const selectNode = (node) => {
   selection.type = 'node';
   selection.data = node;
   selection.parent = null;
+  selection.showPanel = false;
 };
 
 export const selectTransition = (transition, sourceState) => {
   selection.type = 'transition';
   selection.data = transition;
   selection.parent = sourceState;
+  selection.showPanel = false;
 };
 
 export const selectTargetEdge = (transition, targetState, sourceState) => {
   selection.type = 'target-edge';
   selection.data = { transition, targetState };
   selection.parent = sourceState;
+  selection.showPanel = false;
+};
+
+export const clearSelection = () => {
+  selection.type = null;
+  selection.data = null;
+  selection.parent = null;
+  selection.showPanel = false;
 };

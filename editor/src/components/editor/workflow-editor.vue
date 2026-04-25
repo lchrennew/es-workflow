@@ -2,17 +2,20 @@
   <div class="workflow-editor-container">
     <editor-header />
     <div class="editor-main">
-      <canvas-board />
+      <canvas-board @state-contextmenu="onContextMenu" @transition-contextmenu="onContextMenu"
+        @target-contextmenu="onContextMenu" />
       <property-panel />
     </div>
   </div>
 </template>
 
 <script setup>
-import { onMounted, watch, ref } from 'vue';
+import { onMounted, watch, ref, provide } from 'vue';
 import { parse, stringify } from 'yaml';
-import { workflow, initWorkflow, loadWorkflow, getCleanWorkflow } from '../../composables/use-workflow.js';
+import { workflow, initWorkflow, loadWorkflow, getCleanWorkflow, selection as defaultSelection, createSelectionState, WORKFLOW_SELECTION_KEY } from '../../composables/use-workflow.js';
 import { updateEmitters } from '../../composables/emitters.js';
+import { updateEmitterRules } from '../../composables/emitter-rules.js';
+import { updatePrefetchers } from '../../composables/prefetchers.js';
 import EditorHeader from './editor-header.vue';
 import CanvasBoard from './canvas-board.vue';
 import PropertyPanel from './property-panel.vue';
@@ -25,12 +28,28 @@ const props = defineProps({
   fetchEmitters: {
     type: Function,
     default: null
+  },
+  fetchEmitterRules: {
+    type: Function,
+    default: null
+  },
+  fetchPrefetchers: {
+    type: Function,
+    default: null
   }
 });
 
 const emit = defineEmits(['update:value']);
 
+const selectionState = createSelectionState();
+provide(WORKFLOW_SELECTION_KEY, selectionState);
+const { selection } = selectionState;
+
 let isUpdatingInternal = false;
+
+const onContextMenu = () => {
+  selection.showPanel = true;
+};
 
 // 当组件接收到外部传入的 yaml 时进行解析和加载
 watch(() => props.value, (newYaml) => {
@@ -56,36 +75,49 @@ watch(workflow, () => {
     const cleanWorkflow = getCleanWorkflow();
 
     const yamlString = stringify(cleanWorkflow);
-    if (yamlString !== props.value) {
-      emit('update:value', yamlString);
-    }
+    emit('update:value', yamlString);
   } catch (e) {
-    console.error('Failed to stringify workflow to YAML:', e);
+    console.error('Failed to stringify workflow data to YAML:', e);
   } finally {
-    // 延迟恢复标记，防止立即被 props watch 捕捉到
+    // 稍后重置标志，以避免触发外部的 watcher
     setTimeout(() => {
       isUpdatingInternal = false;
     }, 0);
   }
 }, { deep: true });
 
-// 组件挂载时初始化数据
 onMounted(async () => {
-  // 如果有动态拉取 emitter 的方法，则执行并更新
+  // 如果没有 workflow 数据，则初始化一个
+  if (!workflow.spec.states.length) {
+    initWorkflow();
+  }
+
+  // 挂载时拉取所有外部数据源
   if (props.fetchEmitters) {
     try {
       const data = await props.fetchEmitters();
-      if (data && Array.isArray(data)) {
-        updateEmitters(data);
-      }
+      updateEmitters(data);
     } catch (e) {
       console.error('Failed to fetch emitters:', e);
     }
   }
 
-  // 只有在没有外部传入 yaml 数据时，才执行默认初始化
-  if (!props.value) {
-    initWorkflow();
+  if (props.fetchEmitterRules) {
+    try {
+      const data = await props.fetchEmitterRules();
+      updateEmitterRules(data);
+    } catch (e) {
+      console.error('Failed to fetch emitter rules:', e);
+    }
+  }
+
+  if (props.fetchPrefetchers) {
+    try {
+      const data = await props.fetchPrefetchers();
+      updatePrefetchers(data);
+    } catch (e) {
+      console.error('Failed to fetch prefetchers:', e);
+    }
   }
 });
 </script>
@@ -96,12 +128,13 @@ onMounted(async () => {
   flex-direction: column;
   height: 100%;
   width: 100%;
+  background: #f0f2f5;
 
   .editor-main {
-    display: flex;
     flex: 1;
-    overflow: hidden;
+    display: flex;
     position: relative;
+    overflow: hidden;
   }
 }
 </style>

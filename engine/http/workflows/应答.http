@@ -6,9 +6,9 @@ Host: {{host}}
 Content-Type: application/json
 
 {
-  "run": "demo.two-parallel.69e9be2eeb82f62b48318ab1",
-  "task": "69e9be2eeb82f66aad318ab5",
-  "request": "69e9be2eeb82f64d81318ab6",
+  "run": "demo.workflow.69ed50f16992e32421694735",
+  "task": "69ed50f16992e3cae2694739",
+  "request": "69ed50f16992e3a20d69473b",
   "action": "ACCEPT",
   "payload": "不错"
 }

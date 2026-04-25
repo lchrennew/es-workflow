@@ -91,6 +91,15 @@
   - `parent`：前序 TaskId（ObjectId）
   - `name`：触发事件名（内部事件，即 `transition.event`）
 
+### TaskEndEvent（任务结束事件）
+- 含义：Task 进入终态时记录的“结束事件名”（内部事件，即 `transition.event`），便于审计与可视化。
+- 字段：
+  - `endEvent`：结束事件名（String）
+  - `endEventId`：对应的 `WorkflowEvent.id`（ObjectId）
+- 赋值规则：
+  - Task 进入 `Ignored`：固定写入 `"ignored"`
+  - Task 进入 `Completed`：写入导致该 Task 完成并推进的事件名（例如 `"passed"` / `"rejected"` / `"start"`）
+
 ### Ignored（任务自动终止态）
 - 含义：任务已创建但因条件不满足被自动终止，不进入实际处理流程；属于“完成态”的一种。
 
@@ -139,7 +148,11 @@
 
 ### Emitter.allowedEvents（对外可见内部事件清单）
 - 含义：配置在 `WorkflowStateEmitter.spec.allowedEvents` 上，用于声明该 emitter 的规则链可能产出哪些内部事件（`transition.event`），并提供显示名称。
-- 结构：每项包含 `name`（内部事件名）与 `title`（显示名称）。
+- 结构：每项包含：
+  - `name`（内部事件名）
+  - `title`（显示名称）
+  - `color`（可选，显示颜色）
+  - `icon`（可选，显示图标）
 - 用法：第三方/编排 UI 可据此展示该 state “可能推进到的事件出口”；引擎可用其对 `EmitterRule` 产出的 `event.name` 做校验（策略由实现决定）。
 
 ### WorkflowEvent（运行期事件）

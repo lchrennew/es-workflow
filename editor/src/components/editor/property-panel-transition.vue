@@ -47,11 +47,14 @@
 </template>
 
 <script setup>
-import { reactive, computed, watch } from 'vue';
+import { reactive, computed, watch, inject } from 'vue';
 import { Form as AForm, FormItem as AFormItem, Select as ASelect, SelectOption as ASelectOption, Button as AButton, Space as ASpace } from 'ant-design-vue';
-import { selection } from '../../composables/use-workflow.js';
+import { selection as defaultSelection, WORKFLOW_SELECTION_KEY, workflow, getCleanWorkflow } from '../../composables/use-workflow.js';
 import { removeTransition } from '../../composables/workflow-ops.js';
 import { emitterOptions } from '../../composables/emitters.js';
+
+const { selection } = inject(WORKFLOW_SELECTION_KEY, { selection: defaultSelection });
+
 
 const formData = reactive({});
 
@@ -89,6 +92,7 @@ const handleSave = () => {
       }
     });
     delete selection.data.title; // 强制删除废弃的 title 字段
+    selection.showPanel = false;
   }
 };
 
@@ -96,6 +100,7 @@ const handleRemoveTransition = () => {
   if (selection.data && selection.parent) {
     removeTransition(selection.parent, selection.data.event);
     selection.type = null;
+    selection.showPanel = false;
   }
 };
 </script>

@@ -23,6 +23,7 @@
 - [ADR-019：Prefetcher 作为独立配置领域（kind/name/metadata/spec + script）](./decisions/ADR-019.md)
 - [ADR-020：引入 EmitterRule 领域模型以复用“判定规则”](./decisions/ADR-020.md)
 - [ADR-021：在 WorkflowTask 上增加 source（parent + event）以增强可追溯性](./decisions/ADR-021.md)
+- [ADR-022：在 WorkflowTask 上增加 endEvent 记录任务结束事件](./decisions/ADR-022.md)
 
 ## 历史（已废弃，仅保留用于追溯）
 

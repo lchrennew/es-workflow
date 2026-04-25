@@ -152,12 +152,13 @@ const sendRequest = async (run, task, target) => {
 
 export const emitRunEvent = async (run, task, name) => {
     logger.info('触发事件...', name, run.id, task.id)
+    task.endEvent = name
     task.status = 'completed'
     logger.info('触发事件...任务完成', name, run.id, task.id)
     dumpOutputParameters(task)
     logger.info('触发事件...输出参数就位', name, run.id, task.id)
     if (task.stateName !== 'initial')
-        pushEvent(run, { type: 'task', message: `待办任务${ task.title }已完成：${ name }` })
+        task.endEventId = pushEvent(run, { type: 'task', message: `待办任务${ task.title }已完成：${ name }` })
 
     logger.info('触发事件...保存运行信息', name, run.id, task.id)
     await saveRun(run)
@@ -236,4 +237,8 @@ export const respondRun = async (run, task, request, action, payload) => {
     await executeEmitter(state, { run, task, request })
 }
 
-export const pushEvent = (run, event) => run.events.push({ id: generateObjectID(), ...event })
+export const pushEvent = (run, event) => {
+    const id = generateObjectID();
+    run.events.push({ id, ...event });
+    return id
+}

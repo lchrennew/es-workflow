@@ -136,9 +136,9 @@ export const removeNode = (name) => {
   reorderStates();
 };
 
-export const performAutoLayout = () => {
-  const states = workflow.spec.states;
-  if (!states.length) return;
+export const performAutoLayout = (customStates, customCanvasState) => {
+  const states = customStates || workflow.spec.states;
+  if (!states || !states.length) return;
 
   // 1. Build Graph
   const nodes = new Set();
@@ -408,6 +408,7 @@ export const performAutoLayout = () => {
   });
 
   // 重置画布视口
-  canvasState.offsetX = 0;
-  canvasState.offsetY = 0;
+  const canvas = customCanvasState || canvasState;
+  canvas.offsetX = 0;
+  canvas.offsetY = 0;
 };

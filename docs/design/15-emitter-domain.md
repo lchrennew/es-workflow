@@ -46,6 +46,8 @@ class AllowedAction {
 class AllowedEvent {
   +String name
   +String title
+  +String color
+  +String icon
 }
 
 class EmitterSpec {
@@ -92,6 +94,8 @@ Emitter 的职责是“定义可执行操作清单”，触发判定通过独立
 - 结构：
   - `name`：内部事件名（对应 `transition.event`，例如 `passed` / `rejected`）
   - `title`：显示名称（用于 UI 展示）
+  - `color`：显示颜色（可选，用于 UI；建议十六进制色值如 `#22c55e`）
+  - `icon`：显示图标（可选，用于 UI；建议用前端图标库的 iconKey，例如 `check`/`x`/`play`）
 - 约束建议：
   - `allowedEvents[*].name` 在同一 emitter 内不重复
   - 规则链产出的 `event.name` 应属于该集合（校验策略由实现决定）
@@ -128,8 +132,12 @@ spec:
   allowedEvents:
     - name: passed
       title: 通过
+      color: "#22c55e"
+      icon: "check"
     - name: rejected
       title: 拒绝
+      color: "#ef4444"
+      icon: "x"
 ```
 
 ---
@@ -150,6 +158,8 @@ spec:
   allowedEvents:
     - name: start
       title: 启动
+      color: "#3b82f6"
+      icon: "play"
 ```
 
 > 配套规则：建议在 `initial` state 上配置 `emitterRules: [auto-start]`，对应规则 `system/start/auto-start`（见 `16-emitter-rule-domain.md`）。

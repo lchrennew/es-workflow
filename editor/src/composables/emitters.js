@@ -15,8 +15,8 @@ export const emitterOptions = reactive([
         { action: 'REFUSE', title: '拒绝' }
       ],
       allowedEvents: [
-        { name: 'passed', title: '通过' },
-        { name: 'rejected', title: '拒绝' }
+        { name: 'passed', title: '通过', color: '#22c55e', icon: 'check' },
+        { name: 'rejected', title: '拒绝', color: '#ef4444', icon: 'x' }
       ]
     }
   },
@@ -30,7 +30,7 @@ export const emitterOptions = reactive([
     spec: {
       allowedActions: [],
       allowedEvents: [
-        { name: 'start', title: '启动' }
+        { name: 'start', title: '启动', color: '#3b82f6', icon: 'play' }
       ]
     }
   }

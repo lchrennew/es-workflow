@@ -21,17 +21,22 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, inject } from 'vue';
 import { Drawer as ADrawer } from 'ant-design-vue';
-import { selection } from '../../composables/use-workflow.js';
+import { selection as defaultSelection, WORKFLOW_SELECTION_KEY, workflow, getCleanWorkflow } from '../../composables/use-workflow.js';
 
 import PropertyPanelNode from './property-panel-node.vue';
 import PropertyPanelTransition from './property-panel-transition.vue';
 import PropertyPanelTargetEdge from './property-panel-target-edge.vue';
 
+const { selection } = inject(WORKFLOW_SELECTION_KEY, { selection: defaultSelection });
+
+
 // 1. 选择状态节点（不含开始和结束节点）、事件节点、目标连线时弹出
 // 2. 取消选择时自动收回
 const isOpen = computed(() => {
+  if (!selection.showPanel) return false;
+
   if (!selection.type) return false;
 
   if (selection.type === 'node') {
@@ -50,7 +55,7 @@ const isOpen = computed(() => {
 });
 
 const handleClose = () => {
-  selection.type = null;
+  selection.showPanel = false;
 };
 </script>
 

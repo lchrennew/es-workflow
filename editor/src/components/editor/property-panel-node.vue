@@ -46,13 +46,16 @@
 </template>
 
 <script setup>
-import { reactive, computed, watch, ref } from 'vue';
-import { Form as AForm, FormItem as AFormItem, Input as AInput, Select as ASelect, SelectOption as ASelectOption, Textarea as ATextarea, Button as AButton, Space as ASpace } from 'ant-design-vue';
-import { selection } from '../../composables/use-workflow.js';
+import { reactive, watch, ref, computed, inject } from 'vue';
+import { Form as AForm, FormItem as AFormItem, Input as AInput, Select as ASelect, SelectOption as ASelectOption, Button as AButton, Textarea as ATextarea, Space as ASpace } from 'ant-design-vue';
+import { selection as defaultSelection, WORKFLOW_SELECTION_KEY, workflow, getCleanWorkflow } from '../../composables/use-workflow.js';
 import { removeNode } from '../../composables/workflow-ops.js';
 import { emitterOptions } from '../../composables/emitters.js';
-import { emitterRuleOptions } from '../../composables/emitter-rules.js';
+import { emitterRules } from '../../composables/emitter-rules.js';
 import EmitterRuleList from './emitter-rule-list.vue';
+
+const { selection } = inject(WORKFLOW_SELECTION_KEY, { selection: defaultSelection });
+
 
 const formRef = ref(null);
 const formData = reactive({});
@@ -87,7 +90,7 @@ const onEmitterChange = () => {
 const availableEmitterRules = computed(() => {
   if (!formData.emitter) return [];
   const prefix = formData.emitter + '/';
-  return emitterRuleOptions
+  return emitterRules
     .filter(r => r.name.startsWith(prefix))
     .map(r => ({
       ...r,
@@ -125,6 +128,7 @@ const handleSave = async () => {
         selection.data.transitions.splice(ignoredIndex, 1);
       }
     }
+    selection.showPanel = false;
   }
 };
 
@@ -132,6 +136,7 @@ const handleRemoveNode = () => {
   if (selection.data && selection.data.name) {
     removeNode(selection.data.name);
     selection.type = null;
+    selection.showPanel = false;
   }
 };
 </script>

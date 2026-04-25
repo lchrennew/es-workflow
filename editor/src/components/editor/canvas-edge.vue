@@ -1,31 +1,52 @@
 <template>
-  <g class="canvas-edge" :class="{ selected: isSelected }" @click="emit('click')">
+  <g class="canvas-edge"
+    :class="{ selected: isSelected, 'not-end-event': edge.notEndEvent, 'is-viewer': edge.isViewer }"
+    @click="emit('click')">
     <!-- 加宽的隐形点击区域 -->
     <path class="edge-path-click-area" :d="pathD" fill="none" stroke="transparent" stroke-width="15" />
 
     <!-- 单层流动的虚线 -->
-    <path class="edge-path-animated" :d="pathD" fill="none" />
+    <path class="edge-path-animated" :d="pathD" :style="customStyle" fill="none" />
   </g>
 </template>
 
 <script setup>
-import { computed } from 'vue';
-import { selection } from '../../composables/use-workflow.js';
+import { computed, inject } from 'vue';
+import { selection as defaultSelection, WORKFLOW_SELECTION_KEY } from '../../composables/use-workflow.js';
+
+const { selection } = inject(WORKFLOW_SELECTION_KEY, { selection: defaultSelection });
 
 const props = defineProps({
-  edge: Object
+  edge: {
+    type: Object,
+    required: true
+  }
 });
 
 const emit = defineEmits(['click']);
 
 const isSelected = computed(() => {
-  if (selection.type === 'target-edge' && selection.data?.transition === props.edge.transition && selection.data?.targetState === props.edge.targetState) {
-    return true;
+  if (selection.type === 'target-edge') {
+    return props.edge.type === 'transition-to-target' &&
+      selection.data?.transition?.event === props.edge.transition?.event &&
+      selection.parent?.name === props.edge.sourceState?.name &&
+      selection.data?.targetState?.name === props.edge.targetState?.name;
   }
-  if (selection.type === 'transition' && props.edge.type === 'state-to-transition' && selection.data === props.edge.transition) {
-    return true;
+  if (selection.type === 'transition') {
+    return props.edge.type === 'state-to-transition' &&
+      selection.data?.event === props.edge.transition?.event &&
+      selection.parent?.name === props.edge.sourceState?.name;
   }
   return false;
+});
+
+const customStyle = computed(() => {
+  if (props.edge.eventColor && !props.edge.notEndEvent) {
+    return {
+      stroke: props.edge.eventColor
+    };
+  }
+  return {};
 });
 
 const pathD = computed(() => {
@@ -67,6 +88,11 @@ const pathD = computed(() => {
   cursor: pointer;
   pointer-events: auto;
 
+  /* 在 viewer 模式下，禁用鼠标交互的光标样式 */
+  &.is-viewer {
+    cursor: default;
+  }
+
   .edge-path-click-area {
     fill: none;
     stroke: transparent;
@@ -82,8 +108,17 @@ const pathD = computed(() => {
     animation: flow 1s linear infinite;
   }
 
-  &:hover,
-  &.selected {
+  /* 在 viewer 模式下，未触发的连线恢复原始默认颜色，取消之前的加深覆盖 */
+  &.not-end-event {
+    .edge-path-animated {
+      /* 移除强制浅灰或深灰的颜色覆盖，让它使用基础样式 stroke: #b3c0d1; */
+      stroke-width: 1;
+    }
+  }
+
+  /* 非 viewer 模式才允许悬浮和选中高亮 */
+  &:not(.is-viewer):hover,
+  &:not(.is-viewer).selected {
     .edge-path-animated {
       stroke-width: 3;
       stroke: #67c23a;

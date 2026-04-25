@@ -1,43 +1,113 @@
 <template>
-  <div class="canvas-board" tabindex="0" @mousedown.self="onCanvasMouseDown" @dblclick.self="onCanvasDoubleClick">
+  <div class="canvas-board" tabindex="0" @mousedown.self="onCanvasMouseDown" @dblclick.self="onCanvasDoubleClick"
+    :class="{ readonly }">
     <svg class="edges-layer" style="overflow: visible;">
-      <g :transform="`translate(${canvasState.offsetX}, ${canvasState.offsetY})`">
+      <g :transform="`translate(${localCanvasState.offsetX}, ${localCanvasState.offsetY})`">
         <!-- Edges -->
-        <canvas-edge v-for="edge in edges" :key="edge.id" :edge="edge" @click="onEdgeClick(edge)" />
+        <canvas-edge v-for="edge in edges" :key="edge.id" :edge="edge" @click="onEdgeClick(edge)"
+          @contextmenu.prevent="onEdgeContextMenu(edge)" />
         <!-- Drawing Line -->
-        <line v-if="drawing.isDrawing" :x1="drawing.startX" :y1="drawing.startY" :x2="drawing.currentX"
-          :y2="drawing.currentY" class="drawing-line" />
+        <line v-if="localDrawing.isDrawing && !readonly" :x1="localDrawing.startX" :y1="localDrawing.startY"
+          :x2="localDrawing.currentX" :y2="localDrawing.currentY" class="drawing-line" />
       </g>
     </svg>
 
-    <div class="nodes-layer" :style="{ transform: `translate(${canvasState.offsetX}px, ${canvasState.offsetY}px)` }">
+    <div class="nodes-layer"
+      :style="{ transform: `translate(${localCanvasState.offsetX}px, ${localCanvasState.offsetY}px)` }">
       <!-- Nodes -->
-      <canvas-node v-for="state in workflow.spec.states" :key="`node-${state.name}`" :node="state"
-        @click="onNodeClick(state)" />
+      <canvas-node v-for="state in currentWorkflow.spec.states" :key="`node-${state.name}`" :node="state"
+        :readonly="readonly" @click="onNodeClick(state)" @contextmenu.prevent="onNodeContextMenu(state)" />
       <!-- Transitions -->
-      <template v-for="state in workflow.spec.states" :key="`transitions-${state.name}`">
+      <template v-for="state in currentWorkflow.spec.states" :key="`transitions-${state.name}`">
         <canvas-transition v-for="transition in state.transitions" :key="`trans-${state.name}-${transition.event}`"
-          :transition="transition" :sourceState="state" @click="onTransitionClick(transition, state)" />
+          :transition="transition" :sourceState="state" :readonly="readonly"
+          @click="onTransitionClick(transition, state)"
+          @contextmenu.prevent="onTransitionContextMenu(transition, state)" />
       </template>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted } from 'vue';
-import { workflow, selection, drawing, selectNode, selectTransition, selectTargetEdge, canvasState } from '../../composables/use-workflow.js';
+import { computed, onMounted, onUnmounted, reactive, inject, watch } from 'vue';
+import { workflow, selection as defaultSelection, drawing as globalDrawing, selectNode as defaultSelectNode, selectTransition as defaultSelectTransition, selectTargetEdge as defaultSelectTargetEdge, clearSelection as defaultClearSelection, canvasState as globalCanvasState, WORKFLOW_SELECTION_KEY } from '../../composables/use-workflow.js';
 import { addState } from '../../composables/use-workflow.js';
-import { removeNode, removeTransition, removeTarget } from '../../composables/workflow-ops.js';
+import { removeNode, removeTransition, removeTarget, performAutoLayout } from '../../composables/workflow-ops.js';
 import CanvasNode from './canvas-node.vue';
 import CanvasTransition from './canvas-transition.vue';
 import CanvasEdge from './canvas-edge.vue';
+import { emitterOptions } from '../../composables/emitters.js';
+
+const { selection, selectNode, selectTransition, selectTargetEdge, clearSelection } = inject(WORKFLOW_SELECTION_KEY, {
+  selection: defaultSelection,
+  selectNode: defaultSelectNode,
+  selectTransition: defaultSelectTransition,
+  selectTargetEdge: defaultSelectTargetEdge,
+  clearSelection: defaultClearSelection
+});
+
+const props = defineProps({
+  workflowData: {
+    type: Object,
+    default: null
+  },
+  readonly: {
+    type: Boolean,
+    default: false
+  }
+});
+
+const emit = defineEmits([
+  'state-click',
+  'state-contextmenu',
+  'transition-click',
+  'transition-contextmenu',
+  'target-click',
+  'target-contextmenu'
+]);
+
+const localCanvasState = props.readonly ? reactive({ offsetX: 0, offsetY: 0 }) : globalCanvasState;
+const localDrawing = props.readonly ? reactive({ isDrawing: false }) : globalDrawing;
+
+const currentWorkflow = computed(() => props.workflowData || workflow);
 
 const edges = computed(() => {
   const result = [];
-  workflow.spec.states.forEach(sourceState => {
+  if (!currentWorkflow.value || !currentWorkflow.value.spec || !currentWorkflow.value.spec.states) return result;
+  currentWorkflow.value.spec.states.forEach(sourceState => {
     if (!sourceState.transitions) return;
     sourceState.transitions.forEach(transition => {
       // Edge 1: state to transition
+      const isEndEvent = props.readonly && sourceState.runStatus?.endEvent === transition.event;
+      let eventColor = null;
+
+      // 如果是 endEvent，计算颜色以供连线使用
+      if (isEndEvent) {
+        // 先检查 transition 上有没有存下来的样式颜色 (如果有直接复用最准确)
+        if (sourceState.emitter) {
+          if (emitterOptions && emitterOptions.value) {
+            const emitterDef = emitterOptions.value.find(e => e.name === sourceState.emitter);
+            if (emitterDef && emitterDef.spec?.allowedEvents) {
+              const evtDef = emitterDef.spec.allowedEvents.find(e => e.name === transition.event);
+              if (evtDef && evtDef.color) {
+                eventColor = evtDef.color;
+              }
+            }
+          }
+        }
+
+        // Fallback 颜色
+        if (!eventColor) {
+          if (transition.event === 'passed' || transition.event === 'start') {
+            eventColor = '#52c41a';
+          } else if (transition.event === 'rejected') {
+            eventColor = '#f5222d';
+          } else {
+            eventColor = '#1890ff';
+          }
+        }
+      }
+
       result.push({
         id: `s2t_${sourceState.name}_${transition.event}`,
         type: 'state-to-transition',
@@ -47,13 +117,16 @@ const edges = computed(() => {
         startY: (sourceState.ui?.y || 0) + 22, // Center of state node (height roughly 44)
         endX: (transition.ui?.x || 0) + 25, // center of transition
         endY: (transition.ui?.y || 0) + 25, // center of transition
-        showArrow: false
+        showArrow: false,
+        notEndEvent: props.readonly && !isEndEvent,
+        isViewer: props.readonly,
+        eventColor: eventColor
       });
 
       // Edge 2: transition to targets
       if (!transition.targets) return;
       transition.targets.forEach(target => {
-        const targetState = workflow.spec.states.find(s => s.name === target.state);
+        const targetState = currentWorkflow.value.spec.states.find(s => s.name === target.state);
         if (targetState) {
           result.push({
             id: `t2t_${sourceState.name}_${transition.event}_${targetState.name}`,
@@ -65,7 +138,10 @@ const edges = computed(() => {
             startY: (transition.ui?.y || 0) + 25, // center of transition
             endX: (targetState.ui?.x || 0) + 70, // center of target state node
             endY: (targetState.ui?.y || 0) + 22, // center of target state node
-            showArrow: true
+            showArrow: true,
+            notEndEvent: props.readonly && !isEndEvent,
+            isViewer: props.readonly,
+            eventColor: eventColor
           });
         }
       });
@@ -81,12 +157,12 @@ const onCanvasMouseDown = (e) => {
 
   const startX = e.clientX;
   const startY = e.clientY;
-  const initialX = canvasState.offsetX;
-  const initialY = canvasState.offsetY;
+  const initialX = localCanvasState.offsetX;
+  const initialY = localCanvasState.offsetY;
 
   const onMouseMove = (ev) => {
-    canvasState.offsetX = initialX + ev.clientX - startX;
-    canvasState.offsetY = initialY + ev.clientY - startY;
+    localCanvasState.offsetX = initialX + ev.clientX - startX;
+    localCanvasState.offsetY = initialY + ev.clientY - startY;
   };
 
   const onMouseUp = () => {
@@ -99,9 +175,11 @@ const onCanvasMouseDown = (e) => {
 };
 
 const onCanvasDoubleClick = (e) => {
+  if (props.readonly) return;
+
   const rect = e.currentTarget.getBoundingClientRect();
-  const x = e.clientX - rect.left - canvasState.offsetX;
-  const y = e.clientY - rect.top - canvasState.offsetY;
+  const x = e.clientX - rect.left - localCanvasState.offsetX;
+  const y = e.clientY - rect.top - localCanvasState.offsetY;
 
   const name = `state_${Date.now()}`;
   addState({
@@ -112,29 +190,65 @@ const onCanvasDoubleClick = (e) => {
   });
 };
 
-const clearSelection = () => {
-  selection.type = null;
-  selection.data = null;
-  selection.parent = null;
+const onNodeClick = (node) => {
+  if (!props.readonly) {
+    selectNode(node);
+  }
+  emit('state-click', node);
 };
 
-const onNodeClick = (node) => {
+const onNodeContextMenu = (node) => {
   selectNode(node);
+  emit('state-contextmenu', node);
 };
 
 const onTransitionClick = (transition, state) => {
-  selectTransition(transition, state);
+  if (!props.readonly) {
+    selectTransition(transition, state);
+  }
+  emit('transition-click', transition, state);
+};
+
+const onTransitionContextMenu = (transition, state) => {
+  if (!props.readonly) {
+    selectTransition(transition, state);
+  }
+  emit('transition-contextmenu', transition, state);
 };
 
 const onEdgeClick = (edge) => {
+  if (!props.readonly) {
+    if (edge.type === 'state-to-transition') {
+      selectTransition(edge.transition, edge.sourceState);
+    } else if (edge.type === 'transition-to-target') {
+      selectTargetEdge(edge.transition, edge.targetState, edge.sourceState);
+    }
+  }
   if (edge.type === 'state-to-transition') {
-    selectTransition(edge.transition, edge.sourceState);
+    emit('transition-click', edge.transition, edge.sourceState);
   } else if (edge.type === 'transition-to-target') {
-    selectTargetEdge(edge.transition, edge.targetState, edge.sourceState);
+    emit('target-click', edge);
+  }
+};
+
+const onEdgeContextMenu = (edge) => {
+  if (!props.readonly) {
+    if (edge.type === 'state-to-transition') {
+      selectTransition(edge.transition, edge.sourceState);
+    } else if (edge.type === 'transition-to-target') {
+      selectTargetEdge(edge.transition, edge.targetState, edge.sourceState);
+    }
+  }
+  if (edge.type === 'state-to-transition') {
+    emit('transition-contextmenu', edge.transition, edge.sourceState);
+  } else if (edge.type === 'transition-to-target') {
+    emit('target-contextmenu', edge);
   }
 };
 
 const onKeyDown = (e) => {
+  if (props.readonly) return;
+
   if (e.key === 'Delete' || e.key === 'Backspace') {
     // 检查当前是否有节点、连线被选中
     if (!selection.type) return;
@@ -157,6 +271,19 @@ const onKeyDown = (e) => {
     }
   }
 };
+
+const checkAndApplyLayout = () => {
+  if (!currentWorkflow.value || !currentWorkflow.value.spec || !currentWorkflow.value.spec.states) return;
+  const states = currentWorkflow.value.spec.states;
+  const needsLayout = states.some(s => !s.ui || (s.ui.x === undefined && s.ui.y === undefined));
+  if (needsLayout) {
+    performAutoLayout(states, localCanvasState);
+  }
+};
+
+watch(() => props.workflowData, () => {
+  checkAndApplyLayout();
+}, { deep: true, immediate: true });
 
 onMounted(() => {
   document.addEventListener('keydown', onKeyDown);

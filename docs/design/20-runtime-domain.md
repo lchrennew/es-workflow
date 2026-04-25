@@ -42,6 +42,8 @@ class WorkflowTask {
   +String id  %% ObjectID
   +String stateName
   +TaskSource source
+  +String endEvent
+  +String endEventId  %% ObjectID
   +WorkflowTaskStatus status
   +List~WorkflowRequest~ requests
   +Map~String,String~ inputParameters
@@ -127,6 +129,12 @@ WorkflowTask *-- TaskSource : source
    - `task.source.parent`：前序任务 id（ObjectId）。表示“是谁触发/推进到激活了本 state”
    - `task.source.name`：触发事件名（内部事件，即 `transition.event`，例如 `passed` / `rejected` / `b_skipped` / `start`）
    - 备注：`initial` 的 Task 可令 `source` 为空或由实现填充（例如 parent=null,name=null）
+8. **Task 的结束事件（新增）**：
+   - `task.endEvent`：Task 进入终态时记录的“结束事件名”（内部事件，即 `transition.event`）
+   - `task.endEventId`：对应的 `WorkflowEvent.id`（ObjectId），用于精确关联导致任务结束的那条事件记录
+   - 赋值规则：
+     - `Ignored`：固定写入 `"ignored"`
+     - `Completed`：写入导致该 Task 完成并推进到后续状态的事件名（例如 `"passed"` / `"rejected"` / `"start"`）
 
 ### Fork/Join（当前取向）
 当前版本优先采用“事件驱动 + 启动条件不通过触发事件/忽略任务”的低复杂度方案，不引入 ForkID 机制。

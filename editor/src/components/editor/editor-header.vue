@@ -17,6 +17,7 @@ import { workflow, getCleanWorkflow } from '../../composables/use-workflow.js';
 import { performAutoLayout } from '../../composables/workflow-ops.js';
 import YamlViewer from './yaml-viewer.vue';
 
+
 const showYaml = ref(false);
 
 const handleAutoLayout = () => {

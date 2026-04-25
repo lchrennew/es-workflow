@@ -56,7 +56,7 @@ export default class RunController extends Controller {
         const request = task.requests.find(request => request.id === requestId)
 
         if (!request) return ctx.body = { ok: false, message: '无可应答请求' }
-        if (!request.response) return ctx.body = { ok: false, message: '请求不可重复应答' }
+        if (request.response) return ctx.body = { ok: false, message: '请求不可重复应答' }
 
         await respondRun(run, task, request, action, payload)
 
