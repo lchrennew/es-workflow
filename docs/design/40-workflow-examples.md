@@ -431,3 +431,64 @@ stateDiagram
   b --> end: rejected
   c --> end: ignored / passed / rejected
 ```
+
+---
+
+## 附：layout（可选）示例（仅用于 UI 布局）
+
+> 说明：`spec.layout` 仅用于前端画布布局展示，不参与运行语义。  
+> 其中：
+> - `layout.states` 的 key 为 `state.name`
+> - `layout.transitions` 的 key 为 `<fromState>::<event>`（同一 state 内 event 唯一，便于定位一条迁移）
+
+```yaml
+kind: workflow
+name: demo/workflow
+metadata:
+  title: 未命名工作流
+spec:
+  states:
+    - name: initial
+      title: 开始
+      emitter: system/start
+      emitterRules:
+        - auto-start
+      transitions:
+        - event: start
+          targets:
+            - state: state_1777121191808
+              prefetchers: []
+    - name: state_1777121191808
+      title: 新任务
+      emitter: demo/approval
+      emitterRules:
+        - veto
+      transitions:
+        - event: passed
+          targets:
+            - state: end
+              prefetchers: []
+            - state: state_1777121191808
+              prefetchers: []
+    - name: end
+      title: 结束
+      transitions: []
+  layout:
+    states:
+      initial:
+        x: 280
+        y: 50
+      state_1777121191808:
+        x: 280
+        y: 200
+      end:
+        x: 280
+        y: 350
+    transitions:
+      initial::start:
+        x: 325
+        y: 125
+      state_1777121191808::passed:
+        x: 607
+        y: 276
+```

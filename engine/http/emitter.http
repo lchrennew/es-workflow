@@ -9,6 +9,7 @@ kind: workflow-transition-emitter
 name: demo/approval
 metadata:
   title: 审批场景 emitter
+  forUserState: true
 spec:
   allowedActions:
     - action: ACCEPT
@@ -30,6 +31,7 @@ kind: workflow-transition-emitter
 name: system/start
 metadata:
   title: 开始节点 emitter
+  forUserState: false
 spec:
   allowedActions: []
   allowedEvents:

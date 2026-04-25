@@ -1,0 +1,33 @@
+{
+  "name": "es-workflow-editor",
+  "private": false,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/es-workflow-editor.umd.js",
+  "module": "./dist/es-workflow-editor.es.js",
+  "exports": {
+    ".": {
+      "import": "./dist/es-workflow-editor.es.js",
+      "require": "./dist/es-workflow-editor.umd.js"
+    },
+    "./style.css": "./dist/style.css"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "ant-design-vue": "^4.2.6",
+    "vue": "^3.6.0-beta.10",
+    "yaml": "^3.0.0-0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.6",
+    "less": "^4.6.4",
+    "vite": "^8.0.10"
+  }
+}

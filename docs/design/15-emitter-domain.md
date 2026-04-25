@@ -35,7 +35,7 @@ class MetadataBase {
 }
 
 class WorkflowStateEmitterMetadata {
-    
+  +Boolean forUserState
 }
 
 class AllowedAction {
@@ -71,6 +71,11 @@ EmitterSpec *-- AllowedEvent : allowedEvents
 
 ### metadata
 - 使用 `WorkflowStateEmitterMetadata`（继承自 `MetadataBase`：标题、tags、审计字段、版本 ObjectId 等）
+- `forUserState`（可选，默认 false）
+  - 含义：标识该 emitter 是否允许被“用户新增的 state”选择/引用（用于 UI 过滤与治理）。
+  - 示例：
+    - `system/*` 这类系统内置 emitter：通常 `forUserState=false`
+    - `demo/*` 或业务 emitter：通常 `forUserState=true`
 
 ### spec
 Emitter 的职责是“定义可执行操作清单”，触发判定通过独立的 `EmitterRule` 完成（见 `16-emitter-rule-domain.md`）。
@@ -113,6 +118,7 @@ kind: workflow-transition-emitter
 name: demo/approval
 metadata:
   title: 审批场景 emitter
+  forUserState: true
 spec:
   allowedActions:
     - action: ACCEPT
@@ -138,6 +144,7 @@ kind: workflow-transition-emitter
 name: system/start
 metadata:
   title: 开始节点 emitter
+  forUserState: false
 spec:
   allowedActions: []
   allowedEvents:

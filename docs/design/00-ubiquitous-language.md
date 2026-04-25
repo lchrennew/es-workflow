@@ -13,6 +13,13 @@
   - `metadata`：工作流元数据（见下方 WorkflowMetadata）
   - `spec`：工作流定义本体（后续细化）
 
+### WorkflowLayout（流程布局，可选）
+- 含义：用于前端/UI 展示的流程画布布局信息，不参与运行语义。
+- 位置：`Workflow.spec.layout`
+- 结构：
+  - `layout.states`：节点坐标字典，key 为 `state.name`，value 为 `{x,y}`
+  - `layout.transitions`：连线坐标字典，key 为 `<fromState>::<event>`，value 为 `{x,y}`
+
 ### WorkflowMetadata（工作流元数据）
 - 含义：描述工作流配置的元信息（在当前模型中作为值对象使用）。
 - 字段（当前已确定）：
@@ -109,6 +116,7 @@
 - 配置结构：`kind/name/metadata/spec`
 - kind（已确认）：`workflow-transition-emitter`
 - 引用方式：Workflow 配置中的 `WorkflowState.emitter` 引用 `WorkflowStateEmitter.name`
+ - metadata.forUserState：是否允许被用户新增 state 选择（用于 UI 过滤与治理）
 
 ### EmitterRule（状态触发规则配置）
 - 含义：独立业务领域中的配置实体，一条规则一个脚本，用于在收到 response 时判定是否产出内部事件名。

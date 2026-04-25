@@ -38,6 +38,7 @@ class WorkflowMetadata {
 
 class WorkflowSpec {
   +List~WorkflowState~ states
+  +WorkflowLayout layout
 }
 
 class WorkflowState {
@@ -47,6 +48,16 @@ class WorkflowState {
   +String emitter
   +List~String~ emitterRules
   +List~WorkflowTransition~ transitions
+}
+
+class WorkflowLayout {
+  +Map~String,LayoutPoint~ states
+  +Map~String,LayoutPoint~ transitions
+}
+
+class LayoutPoint {
+  +Number x
+  +Number y
 }
 
 class WorkflowTransition {
@@ -63,6 +74,8 @@ MetadataBase <|-- WorkflowMetadata
 Workflow *-- WorkflowMetadata : metadata
 Workflow *-- WorkflowSpec : spec
 WorkflowSpec *-- WorkflowState : states
+WorkflowSpec *-- WorkflowLayout : layout
+WorkflowLayout *-- LayoutPoint : states/transitions
 WorkflowState *-- WorkflowTransition : transitions
 WorkflowTransition *-- WorkflowTransitionTarget : targets
 ```
@@ -126,6 +139,9 @@ WorkflowTransition *-- WorkflowTransitionTarget : targets
     - `targets`：目标状态列表（允许多个）
       - `state`：目标状态（引用状态的 `name`）
       - `prefetchers`：预取器标识列表（可选），用于在任务门控/处理前获取数据；此处为**引用**：指向独立配置域 `Prefetcher.name`（见 `12-prefetcher-domain.md`）
+- `layout`：流程布局信息（可选，仅用于前端/UI 展示，不参与运行语义）
+  - `layout.states`：节点坐标字典，key 为 `state.name`，value 为 `{x,y}`
+  - `layout.transitions`：连线坐标字典，key 为 `<fromState>::<event>`，value 为 `{x,y}`
 
 ### 约束（草案，待确认）
 1. `states` 至少包含 1 个状态
@@ -135,9 +151,12 @@ WorkflowTransition *-- WorkflowTransitionTarget : targets
 5. **同一 `transition` 下，`targets[*].state` 不允许重复**（即一次 fan-out 激活的目标状态集合去重）
 6. **同一 `target` 下，`prefetchers[*]` 不允许重复**（同一 prefetcher 不应被重复执行）
 7. **若某 state 配置了 `conditions`，则该 state 必须存在一条 `transition.event="ignored"` 的迁移**（用于条件不通过时的统一推进路径）
-8. 初始状态约定：必须存在且仅存在一个保留状态 `name="initial"`，并且该状态**用户不可删除、不可修改**（由系统保留）
-9. 结束状态约定：必须存在且仅存在一个保留状态 `name="end"`，并且该状态**用户不可删除、不可修改**（由系统保留）
-10. **强制约束：开始/结束状态的迁移规则**
+8. **若配置了 `spec.layout`**（建议校验）：
+   - `layout.states` 中的 key 必须存在于 `spec.states[*].name`
+   - `layout.transitions` 中的 key 必须能解析为 `<fromState>::<event>`，并且该迁移在配置中存在
+9. 初始状态约定：必须存在且仅存在一个保留状态 `name="initial"`，并且该状态**用户不可删除、不可修改**（由系统保留）
+10. 结束状态约定：必须存在且仅存在一个保留状态 `name="end"`，并且该状态**用户不可删除、不可修改**（由系统保留）
+11. **强制约束：开始/结束状态的迁移规则**
    - 开始状态（`initial`）**只能出不能入**：任何 `target.state` 不允许指向 `initial`
    - 开始状态（`initial`）的所有外发迁移，其 `event` **必须等于** `"start"`
    - 开始状态（`initial`）**至少有 1 个外发迁移**
@@ -148,7 +167,7 @@ WorkflowTransition *-- WorkflowTransitionTarget : targets
    - 除 `initial/end` 之外的其他状态：**至少有 1 个入边且至少有 1 个出边**
      - 入边：至少存在一条迁移的某个 target 指向该状态
      - 出边：该状态的 `transitions` 至少包含 1 条外发迁移
-11. **强制约束：开始/结束状态的运行期语义**
+12. **强制约束：开始/结束状态的运行期语义**
    - `initial`：其 Task **创建即完成**，并通过系统调用执行一次 emitterRules 产出事件 `"start"`（用于进入后续状态；默认可用 `system/start/auto-start`）
    - `end`：其 Task **创建即完成**，并驱动 WorkflowRun 结束（Completed）
 
