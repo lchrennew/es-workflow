@@ -3,20 +3,21 @@ import * as YAML from "yaml";
 import { exportName, importNamespace } from "../utils/imports.js";
 import { staticClone } from "../utils/objects.js";
 import { emitRunEvent } from "./run.js";
+import api from "../utils/api.js";
 
 export const saveEmitter = emitter => redis.set(`emitter:${ emitter.name }`, YAML.stringify(emitter));
 export const getEmitter = async name => YAML.parse(await redis.get(`emitter:${ name }`));
 
-export const executeEmitter = async (state, { run, task, request, parameters, api }) => {
+export const executeEmitter = async (state, { run, task, request }) => {
     const { emitter, emitterRules: names } = state
     const emitterRuleNames = names.map(name => `${ emitter }/${ name }`)
     const emitterRules = await getEmitterRules(emitterRuleNames)
     for (const emitterRule of emitterRules) {
         const event = await executeEmitterRule(
             emitterRule,
-            { run, state, task, request, parameters, api });
+            { run, state, task, request });
         if (event.name) {
-            return emitRunEvent(run, task, event.name, {})
+            return emitRunEvent(run, task, event.name,)
         }
     }
 }
@@ -29,10 +30,10 @@ export const getEmitterRules = async names => {
     return (await redis.mget(...keys)).map(ruleString => YAML.parse(ruleString));
 }
 
-export const executeEmitterRule = async (emitterRule, { run, task, request, state, parameters, api }) => {
+export const executeEmitterRule = async (emitterRule, { run, task, request, state }) => {
     const { spec: { script: content } } = emitterRule;
     const script =
-        `async (run, task, request, parameters, api) => {
+        `async (run, task, request, state, api) => {
             const event = { name: null };
             ${ content }
             return event;
@@ -45,6 +46,5 @@ export const executeEmitterRule = async (emitterRule, { run, task, request, stat
         staticClone(task),
         staticClone(request),
         staticClone(state),
-        staticClone(parameters),
         api);
 }

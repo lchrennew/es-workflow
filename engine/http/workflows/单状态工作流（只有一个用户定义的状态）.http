@@ -14,6 +14,8 @@ config:
     states:
       - name: initial
         title: 开始
+        emitter: system/start
+        emitterRules: [ auto-start ]
         transitions:
           - event: start
             targets:

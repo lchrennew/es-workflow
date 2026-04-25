@@ -14,4 +14,18 @@ spec:
     // 任意人通过即通过
     const responses = (task.requests ?? []).map(r => r?.response).filter(Boolean);
     if (responses.some(r => r.action === "ACCEPT")) event.name = "passed";
+
+
+### 新建emitter-rule
+POST /emitter-rules/
+Host: {{host}}
+Content-Type: application/x-yaml
+
+kind: emitter-rule
+name: system/start/auto-start
+metadata:
+  title: 自动开始
+spec:
+  script: |
+    event.name = "start";
 ###

@@ -6,19 +6,21 @@ Host: {{host}}
 Content-Type: application/x-yaml
 
 config:
-  kind: workflow
-  name: demo/empty
-  metadata:
-    title: 空工作流
-  spec:
-    states:
-      - name: initial
-        title: 开始
-        transitions:
-          - event: start
-            targets:
-              - state: end
-                prefetchers: [ ]
-      - name: end
-        title: 结束
+    kind: workflow
+    name: demo/empty
+    metadata:
+      title: 空工作流
+    spec:
+      states:
+        - name: initial
+          title: 开始
+          emitter: system/start
+          emitterRules: [auto-start]
+          transitions:
+            - event: start
+              targets:
+                - state: end
+                  prefetchers: []
+        - name: end
+          title: 结束
 inputParameters: [ ]

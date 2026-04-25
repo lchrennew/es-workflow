@@ -5,6 +5,8 @@ import { getLogger } from 'koa-es-template'
 import { executePrefetcher, getPrefetchers } from "./prefetcher.js";
 import api from "../utils/api.js";
 import { executeEmitter, getEmitter } from "./emitter.js";
+import { exportName, importNamespace } from "../utils/imports.js";
+import { staticClone } from "../utils/objects.js";
 
 const logger = getLogger('run');
 
@@ -19,7 +21,9 @@ const strategies = {
 
         await saveRun(run)
         logger.info('运行状态机...运行已保存');
-        await emit(run, task, 'start', null)
+
+        const state = run.config.spec.states.find(({ name }) => name === task.stateName);
+        await executeEmitter(state, { run, task })
         logger.info('运行状态机...已启动初始任务');
     },
 
@@ -91,7 +95,7 @@ const ignoreTask = async (run, task) => {
 
     if (task.stateName !== 'end') {
         logger.info('创建目标任务...不满足启动条件-触发ignored事件', run.id, task.id)
-        await emit(run, task, 'ignored', null)
+        await emitRunEvent(run, task, 'ignored',)
         logger.info('创建目标任务...不满足启动条件-结束创建过程', run.id, task.id)
     }
 }
@@ -102,10 +106,13 @@ const createNextTask = async (run, target, inputParameters, source) => {
     const task = await createTask(run, nextState.name, inputParameters, source)
     logger.info('创建目标任务...目标任务已创建', run.id, task.id)
 
-    if (nextState.conditions?.length) {
+    if (nextState.conditions) {
         logger.info('创建目标任务...启动条件检查', run.id, task.id)
-
-        const metCondition = nextState.conditions.every(condition => condition.value === run.livingParameters[condition.key]);
+        const script = `async task => {
+            ${ nextState.conditions }
+        }`
+        const { check } = importNamespace(exportName('check', script))
+        const metCondition = await check(staticClone(task))
         if (!metCondition) {
             logger.info('创建目标任务...不满足启动条件，忽略', run.id, task.id)
             return ignoreTask(run, task);
@@ -143,7 +150,7 @@ const sendRequest = async (run, task, target) => {
     // TODO: 向外部系发送
 }
 
-const emit = async (run, task, name, payload) => {
+export const emitRunEvent = async (run, task, name) => {
     logger.info('触发事件...', name, run.id, task.id)
     task.status = 'completed'
     logger.info('触发事件...任务完成', name, run.id, task.id)
@@ -226,9 +233,7 @@ export const respondRun = async (run, task, request, action, payload) => {
     request.response = { action, payload }
     pushEvent(run, { type: 'request', message: `${ request.target }${ actionTitle }了待办事项 ${ task.title }` })
 
-    await executeEmitter(state, { run, task, request, action, payload, api })
+    await executeEmitter(state, { run, task, request })
 }
 
 export const pushEvent = (run, event) => run.events.push({ id: generateObjectID(), ...event })
-
-export const emitRunEvent = emit
