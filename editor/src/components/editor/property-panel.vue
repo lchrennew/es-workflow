@@ -1,36 +1,36 @@
 <template>
   <div class="property-panel-wrapper">
-    <a-drawer title="属性面板" placement="right" :open="isOpen" :mask="false" :closable="true" @close="handleClose"
-      :getContainer="false" :style="{ position: 'absolute' }" width="300"
-      :headerStyle="{ backgroundColor: '#eef0f2', borderBottom: '1px solid #ddd', padding: '15px' }"
-      :bodyStyle="{ padding: '15px', backgroundColor: '#f8f9fa' }">
-      <!-- Node/状态 编辑 -->
-      <property-panel-node v-if="selection.type === 'node'" />
-
-      <!-- Transition/事件 编辑 -->
-      <property-panel-transition v-else-if="selection.type === 'transition'" />
-
-      <!-- Target Edge/目标连线 编辑 -->
-      <property-panel-target-edge v-else-if="selection.type === 'target-edge'" />
-
-      <div v-else class="empty-tip">
-        请选择节点、事件或连线
-      </div>
-    </a-drawer>
+      <a-drawer :bodyStyle="{ padding: '15px', backgroundColor: '#f8f9fa' }"
+                :closable="true"
+                :getContainer="false"
+                :headerStyle="{ backgroundColor: '#eef0f2', borderBottom: '1px solid #ddd', padding: '15px' }"
+                :mask="false"
+                :open="isOpen"
+                destroy-on-close
+                placement="right"
+                title="属性面板"
+                width="300"
+                @close="handleClose">
+          <property-panel-content :type="cachedType" />
+      </a-drawer>
   </div>
 </template>
 
 <script setup>
-import { computed, inject } from 'vue';
+import { computed, inject, ref, watch } from 'vue';
 import { Drawer as ADrawer } from 'ant-design-vue';
 import { selection as defaultSelection, WORKFLOW_SELECTION_KEY, workflow, getCleanWorkflow } from '../../composables/use-workflow.js';
 
-import PropertyPanelNode from './property-panel-node.vue';
-import PropertyPanelTransition from './property-panel-transition.vue';
-import PropertyPanelTargetEdge from './property-panel-target-edge.vue';
+import PropertyPanelContent from './property-panel-content.vue';
 
 const { selection } = inject(WORKFLOW_SELECTION_KEY, { selection: defaultSelection });
 
+const cachedType = ref(null);
+watch(() => selection.type, (val) => {
+  if (val) {
+    cachedType.value = val;
+  }
+}, { immediate: true });
 
 // 1. 选择状态节点（不含开始和结束节点）、事件节点、目标连线时弹出
 // 2. 取消选择时自动收回
@@ -65,14 +65,5 @@ const handleClose = () => {
   height: 100%;
   width: 0;
   overflow: visible;
-
-  // Drawer 内部可能出现提示时需要一些基本样式
-  :deep(.ant-drawer-body) {
-    .empty-tip {
-      text-align: center;
-      color: #999;
-      margin-top: 50px;
-    }
-  }
 }
 </style>
