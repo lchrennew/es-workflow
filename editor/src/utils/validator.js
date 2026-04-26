@@ -193,6 +193,42 @@ export const validateWorkflow = (workflowConfig) => {
     }
   });
 
+  // 可达性约束：除 end 外的所有状态，都必须存在一条“到达 end 的路径”
+  const reverseGraph = {};
+  states.forEach(s => {
+    reverseGraph[s.name] = [];
+  });
+
+  states.forEach(state => {
+    (state.transitions || []).forEach(t => {
+      (t.targets || []).forEach(target => {
+        if (reverseGraph[target.state]) {
+          reverseGraph[target.state].push(state.name);
+        }
+      });
+    });
+  });
+
+  const reachableToEnd = new Set(['end']);
+  const queue = ['end'];
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    const parents = reverseGraph[current] || [];
+    parents.forEach(parent => {
+      if (!reachableToEnd.has(parent)) {
+        reachableToEnd.add(parent);
+        queue.push(parent);
+      }
+    });
+  }
+
+  states.forEach(state => {
+    if (state.name !== 'end' && !reachableToEnd.has(state.name)) {
+      errors.push(`“${state.title || state.name}”节点无法到达结束节点，存在死循环或无法结束的孤岛。`);
+    }
+  });
+
   return {
     valid: errors.length === 0,
     errors
