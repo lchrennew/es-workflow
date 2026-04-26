@@ -12,32 +12,32 @@
     <!-- 常规节点编辑 -->
     <template v-else>
       <a-form ref="formRef" layout="vertical" :model="formData">
-        <a-form-item label="显示标题 (title)">
+        <a-form-item label="名称">
           <a-input v-model:value="formData.title" />
         </a-form-item>
 
-        <a-form-item label="触发器 (emitter)" name="emitter" :rules="[{ required: true, message: '请选择触发器' }]">
+        <a-form-item label="规则集" name="emitter" :rules="[{ required: true, message: '请选择规则集' }]">
           <a-select v-model:value="formData.emitter" placeholder="-- 请选择 --" allow-clear @change="onEmitterChange">
             <a-select-option v-for="option in userSelectableEmitters" :key="option.name" :value="option.name">
-              {{ option.metadata.title }} ({{ option.name }})
+              {{ option.metadata.title }}
             </a-select-option>
           </a-select>
         </a-form-item>
 
-        <a-form-item v-if="formData.emitter" label="判定规则 (emitterRules)" name="emitterRules"
-          :rules="[{ required: true, type: 'array', min: 1, message: '请至少添加一个判定规则' }]">
+        <a-form-item v-if="formData.emitter" label="规则" name="emitterRules"
+          :rules="[{ required: true, type: 'array', min: 1, message: '请至少添加一个规则' }]">
           <emitter-rule-list v-model="formData.emitterRules" :options="availableEmitterRules" />
         </a-form-item>
 
-        <a-form-item label="启动条件 (conditions)">
+        <a-form-item label="启动条件">
           <a-textarea v-model:value="formData.conditions"
             placeholder="例如：return Number(task.inputParameters['SCORE']) > 90;" :rows="3" />
         </a-form-item>
 
         <a-form-item>
           <a-space>
-            <a-button type="primary" @click="handleSave">确认保存</a-button>
-            <a-button danger @click="handleRemoveNode">删除节点</a-button>
+            <a-button type="primary" @click="handleSave">应用</a-button>
+            <a-button danger @click="handleRemoveNode">删除</a-button>
           </a-space>
         </a-form-item>
       </a-form>

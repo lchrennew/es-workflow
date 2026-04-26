@@ -154,9 +154,10 @@ WorkflowTransition *-- WorkflowTransitionTarget : targets
 8. **若配置了 `spec.layout`**（建议校验）：
    - `layout.states` 中的 key 必须存在于 `spec.states[*].name`
    - `layout.transitions` 中的 key 必须能解析为 `<fromState>::<event>`，并且该迁移在配置中存在
-9. 初始状态约定：必须存在且仅存在一个保留状态 `name="initial"`，并且该状态**用户不可删除、不可修改**（由系统保留）
-10. 结束状态约定：必须存在且仅存在一个保留状态 `name="end"`，并且该状态**用户不可删除、不可修改**（由系统保留）
-11. **强制约束：开始/结束状态的迁移规则**
+9. **除结束状态（`end`）外，其他所有状态必须配置 `emitter`，且 `emitterRules` 至少包含 1 个 ruleKey**（用于将外部响应/系统调用归一为内部事件）
+10. 初始状态约定：必须存在且仅存在一个保留状态 `name="initial"`，并且该状态**用户不可删除、不可修改**（由系统保留）
+11. 结束状态约定：必须存在且仅存在一个保留状态 `name="end"`，并且该状态**用户不可删除、不可修改**（由系统保留）
+12. **强制约束：开始/结束状态的迁移规则**
    - 开始状态（`initial`）**只能出不能入**：任何 `target.state` 不允许指向 `initial`
    - 开始状态（`initial`）的所有外发迁移，其 `event` **必须等于** `"start"`
    - 开始状态（`initial`）**至少有 1 个外发迁移**
@@ -167,7 +168,7 @@ WorkflowTransition *-- WorkflowTransitionTarget : targets
    - 除 `initial/end` 之外的其他状态：**至少有 1 个入边且至少有 1 个出边**
      - 入边：至少存在一条迁移的某个 target 指向该状态
      - 出边：该状态的 `transitions` 至少包含 1 条外发迁移
-12. **强制约束：开始/结束状态的运行期语义**
+13. **强制约束：开始/结束状态的运行期语义**
    - `initial`：其 Task **创建即完成**，并通过系统调用执行一次 emitterRules 产出事件 `"start"`（用于进入后续状态；默认可用 `system/start/auto-start`）
    - `end`：其 Task **创建即完成**，并驱动 WorkflowRun 结束（Completed）
 

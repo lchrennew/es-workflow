@@ -1,6 +1,34 @@
 <template>
   <div class="canvas-board" tabindex="0" @mousedown.self="onCanvasMouseDown" @dblclick.self="onCanvasDoubleClick"
     :class="{ readonly }">
+
+    <!-- Canvas validation indicator -->
+    <div class="canvas-validator-indicator" @click="showValidation = true" v-if="!readonly">
+      <template v-if="validationErrors.length === 0">
+        <check-circle-outlined class="indicator-icon success" />
+      </template>
+      <template v-else>
+        <a-badge :count="validationErrors.length" :number-style="{ backgroundColor: '#f5222d' }">
+          <warning-outlined class="indicator-icon error" />
+        </a-badge>
+      </template>
+    </div>
+
+    <!-- Validation modal -->
+    <a-modal title="配置校验结果" :open="showValidation" @cancel="showValidation = false" :footer="null">
+      <div v-if="validationErrors.length === 0" class="validation-success">
+        <check-circle-outlined style="color: #52c41a; font-size: 24px; margin-right: 8px;" />
+        <span>校验通过，配置符合规范！</span>
+      </div>
+      <div v-else class="validation-error">
+        <close-circle-outlined style="color: #f5222d; font-size: 24px; margin-right: 8px;" />
+        <span style="font-weight: bold;">发现 {{ validationErrors.length }} 个配置错误：</span>
+        <ul class="error-list">
+          <li v-for="(error, index) in validationErrors" :key="index">{{ error }}</li>
+        </ul>
+      </div>
+    </a-modal>
+
     <svg class="edges-layer" style="overflow: visible;">
       <g :transform="`translate(${localCanvasState.offsetX}, ${localCanvasState.offsetY})`">
         <!-- Edges -->
@@ -29,8 +57,11 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, inject, watch } from 'vue';
-import { workflow, selection as defaultSelection, drawing as globalDrawing, selectNode as defaultSelectNode, selectTransition as defaultSelectTransition, selectTargetEdge as defaultSelectTargetEdge, clearSelection as defaultClearSelection, canvasState as globalCanvasState, WORKFLOW_SELECTION_KEY } from '../../composables/use-workflow.js';
+import { computed, onMounted, onUnmounted, reactive, inject, watch, ref } from 'vue';
+import { Modal as AModal, Badge as ABadge } from 'ant-design-vue';
+import { WarningOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons-vue';
+import { validateWorkflow } from '../../utils/validator.js';
+import { workflow, getCleanWorkflow, selection as defaultSelection, drawing as globalDrawing, selectNode as defaultSelectNode, selectTransition as defaultSelectTransition, selectTargetEdge as defaultSelectTargetEdge, clearSelection as defaultClearSelection, canvasState as globalCanvasState, WORKFLOW_SELECTION_KEY } from '../../composables/use-workflow.js';
 import { addState } from '../../composables/use-workflow.js';
 import { removeNode, removeTransition, removeTarget, performAutoLayout } from '../../composables/workflow-ops.js';
 import CanvasNode from './canvas-node.vue';
@@ -70,6 +101,25 @@ const localCanvasState = props.readonly ? reactive({ offsetX: 0, offsetY: 0 }) :
 const localDrawing = props.readonly ? reactive({ isDrawing: false }) : globalDrawing;
 
 const currentWorkflow = computed(() => props.workflowData || workflow);
+
+const showValidation = ref(false);
+const validationErrors = ref([]);
+
+// 只要 spec.states 改变就触发校验 (类似IDEA的代码警告)
+watch(
+  () => currentWorkflow.value?.spec?.states,
+  () => {
+    if (!props.readonly) {
+      // 为了防止初始加载时报错，延迟一小会儿执行
+      setTimeout(() => {
+        const cleanConfig = getCleanWorkflow();
+        const result = validateWorkflow(cleanConfig);
+        validationErrors.value = result.errors;
+      }, 0);
+    }
+  },
+  { deep: true, immediate: true }
+);
 
 const edges = computed(() => {
   const result = [];
@@ -306,6 +356,61 @@ onUnmounted(() => {
 
   &:active {
     cursor: grabbing;
+  }
+
+  .canvas-validator-indicator {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    z-index: 100;
+    cursor: pointer;
+    background: white;
+    padding: 8px;
+    border-radius: 50%;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s;
+
+    &:hover {
+      transform: scale(1.1);
+    }
+
+    .indicator-icon {
+      font-size: 24px;
+
+      &.success {
+        color: #52c41a;
+      }
+
+      &.error {
+        color: #faad14;
+      }
+    }
+  }
+
+  .validation-success {
+    display: flex;
+    align-items: center;
+    padding: 20px 0;
+    font-size: 16px;
+  }
+
+  .validation-error {
+    padding: 10px 0;
+
+    .error-list {
+      margin-top: 10px;
+      padding-left: 20px;
+      color: #f5222d;
+      max-height: 300px;
+      overflow-y: auto;
+
+      li {
+        margin-bottom: 8px;
+      }
+    }
   }
 
   .edges-layer {

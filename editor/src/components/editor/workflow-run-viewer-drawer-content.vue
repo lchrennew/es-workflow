@@ -2,8 +2,7 @@
   <div v-if="nodeData && nodeData.runStatus" class="run-details">
     <div class="detail-item">
       <span class="label">运行状态：</span>
-      <span v-if="nodeData.runStatus.status === 'completed' && nodeData.runStatus.endEvent"
-        class="value status-badge"
+      <span v-if="nodeData.runStatus.status === 'completed' && nodeData.runStatus.endEvent" class="value status-badge"
         :style="{ backgroundColor: getEventColor(nodeData.runStatus.endEvent, nodeData) + '20', color: getEventColor(nodeData.runStatus.endEvent, nodeData), border: '1px solid ' + getEventColor(nodeData.runStatus.endEvent, nodeData) }">
         {{ getEventDisplayName(nodeData.runStatus.endEvent, nodeData) }}
       </span>
@@ -12,13 +11,13 @@
       </span>
     </div>
     <div class="detail-item" v-if="nodeData.runStatus?.id">
-      <span class="label">开始时间({{ nodeData.runStatus.id }})：</span>
+      <span class="label">开始时间：</span>
       <span class="value">{{ formatTime(getTimestampFromId(nodeData.runStatus.id)) }}</span>
     </div>
     <div class="detail-item" v-if="nodeData.runStatus?.endEventId">
       <span class="label">
         <template v-if="nodeData.runStatus.status === 'completed'">完成时间</template>
-        <template v-else>结束时间</template>({{ nodeData.runStatus.endEventId }})：
+        <template v-else>结束时间</template>：
       </span>
       <span class="value">{{ formatTime(getTimestampFromId(nodeData.runStatus.endEventId)) }}</span>
     </div>
@@ -232,6 +231,7 @@ const formatTime = (timeStr) => {
           font-weight: 500;
           color: #1890ff;
         }
+
         .time {
           font-size: 12px;
           color: #8c8c8c;
@@ -247,14 +247,17 @@ const formatTime = (timeStr) => {
         .resp-row {
           display: flex;
           margin-bottom: 4px;
+
           &:last-child {
             margin-bottom: 0;
           }
+
           .label {
             color: #8c8c8c;
             width: 45px;
             flex-shrink: 0;
           }
+
           .value {
             color: #262626;
             word-break: break-all;

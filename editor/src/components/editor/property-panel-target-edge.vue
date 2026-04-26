@@ -2,17 +2,18 @@
   <div class="form">
     <a-form layout="vertical">
       <a-form-item>
-        <div>从事件: {{ displayEventName }}</div>
-        <div>到状态: {{ selection.data.targetState.title || selection.data.targetState.name }}</div>
+        <div style="margin-bottom: 8px;">
+          {{ edgeDescription }}
+        </div>
       </a-form-item>
 
-      <a-form-item v-if="selection.data.targetState.name !== 'end'" label="Prefetchers">
+      <a-form-item v-if="selection.data.targetState.name !== 'end'" label="预取器">
         <a-select v-model:value="prefetchersList" mode="multiple" placeholder="请选择预取器" :options="prefetcherOptions"
           allowClear />
       </a-form-item>
 
       <a-form-item>
-        <a-button danger @click="handleRemoveTarget">删除目标连线</a-button>
+        <a-button danger @click="handleRemoveTarget">删除</a-button>
       </a-form-item>
     </a-form>
   </div>
@@ -34,9 +35,21 @@ const displayEventName = computed(() => {
   return getEventDisplayName(selection.data.transition.event, selection.parent);
 });
 
+const edgeDescription = computed(() => {
+  if (!selection.parent || !selection.data?.targetState) return '';
+  const sourceName = selection.parent.title || selection.parent.name;
+  const targetName = selection.data.targetState.title || selection.data.targetState.name;
+  const isSelfLoop = selection.parent.name === selection.data.targetState.name;
+
+  if (isSelfLoop) {
+    return `${sourceName}${displayEventName.value}后回到自身`;
+  }
+  return `${sourceName}${displayEventName.value}后到达${targetName}`;
+});
+
 const prefetcherOptions = computed(() => {
   return prefetchers.map(p => ({
-    label: p.metadata?.title ? `${p.metadata.title} (${p.name})` : p.name,
+    label: p.metadata?.title ? `${p.metadata.title}` : p.name,
     value: p.name
   }));
 });

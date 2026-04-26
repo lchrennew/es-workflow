@@ -7,7 +7,7 @@
           <span style="color: #666; font-style: italic;">系统启动事件不可修改</span>
         </a-form-item>
         <a-form-item>
-          <a-button danger @click="handleRemoveTransition">删除事件</a-button>
+          <a-button danger @click="handleRemoveTransition">删除</a-button>
         </a-form-item>
       </a-form>
     </template>
@@ -19,7 +19,7 @@
           <span style="color: #f5222d; font-style: italic;">条件不满足事件不可修改</span>
         </a-form-item>
         <a-form-item>
-          <a-button danger @click="handleRemoveTransition">删除事件</a-button>
+          <a-button danger @click="handleRemoveTransition">删除</a-button>
         </a-form-item>
       </a-form>
     </template>
@@ -27,18 +27,18 @@
     <!-- 常规事件编辑 -->
     <template v-else>
       <a-form layout="vertical" :model="formData">
-        <a-form-item label="事件标识 (event)">
+        <a-form-item label="事件">
           <a-select v-model:value="formData.event" placeholder="-- 请选择 --">
             <a-select-option v-for="evt in availableEvents" :key="evt.name" :value="evt.name">
-              {{ evt.title }} ({{ evt.name }})
+              {{ evt.title }}
             </a-select-option>
           </a-select>
         </a-form-item>
 
         <a-form-item>
           <a-space>
-            <a-button type="primary" @click="handleSave">确认保存</a-button>
-            <a-button danger @click="handleRemoveTransition">删除事件</a-button>
+            <a-button type="primary" @click="handleSave">应用</a-button>
+            <a-button danger @click="handleRemoveTransition">删除</a-button>
           </a-space>
         </a-form-item>
       </a-form>
