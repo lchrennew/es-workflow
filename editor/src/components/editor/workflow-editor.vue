@@ -15,7 +15,7 @@ import { parse, stringify } from 'yaml';
 import { workflow, initWorkflow, loadWorkflow, getCleanWorkflow, selection as defaultSelection, createSelectionState, WORKFLOW_SELECTION_KEY } from '../../composables/use-workflow.js';
 import { updateEmitters } from '../../composables/emitters.js';
 import { updateEmitterRules } from '../../composables/emitter-rules.js';
-import { updatePrefetchers } from '../../composables/prefetchers.js';
+import { updatePrefetchers, isPrefetchersLoading } from '../../composables/prefetchers.js';
 import EditorHeader from './editor-header.vue';
 import CanvasBoard from './canvas-board.vue';
 import PropertyPanel from './property-panel.vue';
@@ -87,38 +87,47 @@ watch(workflow, () => {
 }, { deep: true });
 
 onMounted(async () => {
+  // 如果有 fetchPrefetchers 属性，立即标记为加载中，避免挂载后立刻触发误报校验
+  if (props.fetchPrefetchers) {
+    isPrefetchersLoading.value = true;
+  }
+
   // 如果没有 workflow 数据，则初始化一个
   if (!workflow.spec.states.length) {
     initWorkflow();
   }
 
-  // 挂载时拉取所有外部数据源
+  // 并发拉取所有外部数据源，提高加载速度
+  const fetchPromises = [];
+
   if (props.fetchEmitters) {
-    try {
-      const data = await props.fetchEmitters();
-      updateEmitters(data);
-    } catch (e) {
-      console.error('Failed to fetch emitters:', e);
-    }
+    fetchPromises.push(
+      props.fetchEmitters()
+        .then(data => updateEmitters(data))
+        .catch(e => console.error('Failed to fetch emitters:', e))
+    );
   }
 
   if (props.fetchEmitterRules) {
-    try {
-      const data = await props.fetchEmitterRules();
-      updateEmitterRules(data);
-    } catch (e) {
-      console.error('Failed to fetch emitter rules:', e);
-    }
+    fetchPromises.push(
+      props.fetchEmitterRules()
+        .then(data => updateEmitterRules(data))
+        .catch(e => console.error('Failed to fetch emitter rules:', e))
+    );
   }
 
   if (props.fetchPrefetchers) {
-    try {
-      const data = await props.fetchPrefetchers();
-      updatePrefetchers(data);
-    } catch (e) {
-      console.error('Failed to fetch prefetchers:', e);
-    }
+    fetchPromises.push(
+      props.fetchPrefetchers()
+        .then(data => updatePrefetchers(data))
+        .catch(e => console.error('Failed to fetch prefetchers:', e))
+        .finally(() => {
+          isPrefetchersLoading.value = false;
+        })
+    );
   }
+
+  await Promise.all(fetchPromises);
 });
 </script>
 

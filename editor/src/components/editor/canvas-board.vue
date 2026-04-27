@@ -4,7 +4,10 @@
 
     <!-- Canvas validation indicator -->
     <div class="canvas-validator-indicator" @click="showValidation = true" v-if="!readonly">
-      <template v-if="validationErrors.length === 0">
+      <template v-if="isPrefetchersLoading">
+        <loading-outlined class="indicator-icon loading" style="color: #1890ff;" />
+      </template>
+      <template v-else-if="validationErrors.length === 0">
         <check-circle-outlined class="indicator-icon success" />
       </template>
       <template v-else>
@@ -16,7 +19,11 @@
 
     <!-- Validation modal -->
     <a-modal title="配置校验结果" :open="showValidation" @cancel="showValidation = false" :footer="null">
-      <div v-if="validationErrors.length === 0" class="validation-success">
+      <div v-if="isPrefetchersLoading" class="validation-loading">
+        <loading-outlined style="color: #1890ff; font-size: 24px; margin-right: 8px;" />
+        <span>依赖数据正在加载中，请稍候...</span>
+      </div>
+      <div v-else-if="validationErrors.length === 0" class="validation-success">
         <check-circle-outlined style="color: #52c41a; font-size: 24px; margin-right: 8px;" />
         <span>校验通过，配置符合规范！</span>
       </div>
@@ -59,7 +66,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, inject, watch, ref } from 'vue';
 import { Modal as AModal, Badge as ABadge } from 'ant-design-vue';
-import { WarningOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons-vue';
+import { WarningOutlined, CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined } from '@ant-design/icons-vue';
 import { validateWorkflow } from '../../utils/validator.js';
 import { workflow, getCleanWorkflow, selection as defaultSelection, drawing as globalDrawing, selectNode as defaultSelectNode, selectTransition as defaultSelectTransition, selectTargetEdge as defaultSelectTargetEdge, clearSelection as defaultClearSelection, canvasState as globalCanvasState, WORKFLOW_SELECTION_KEY } from '../../composables/use-workflow.js';
 import { addState } from '../../composables/use-workflow.js';
@@ -68,6 +75,7 @@ import CanvasNode from './canvas-node.vue';
 import CanvasTransition from './canvas-transition.vue';
 import CanvasEdge from './canvas-edge.vue';
 import { emitterOptions } from '../../composables/emitters.js';
+import { prefetchers, isPrefetchersLoading } from '../../composables/prefetchers.js';
 
 const { selection, selectNode, selectTransition, selectTargetEdge, clearSelection } = inject(WORKFLOW_SELECTION_KEY, {
   selection: defaultSelection,
@@ -106,17 +114,28 @@ const showValidation = ref(false);
 const validationErrors = ref([]);
 
 // 只要 spec.states 改变就触发校验 (类似IDEA的代码警告)
+let validationTimeout = null;
 watch(
-  () => currentWorkflow.value?.spec?.states,
+  [() => currentWorkflow.value?.spec?.states, () => prefetchers.length, () => isPrefetchersLoading.value],
   () => {
-    if (!props.readonly) {
-      // 为了防止初始加载时报错，延迟一小会儿执行
-      setTimeout(() => {
-        const cleanConfig = getCleanWorkflow();
-        const result = validateWorkflow(cleanConfig);
-        validationErrors.value = result.errors;
-      }, 0);
+    if (validationTimeout) {
+      clearTimeout(validationTimeout);
+      validationTimeout = null;
     }
+
+    if (props.readonly) return;
+
+    if (isPrefetchersLoading.value) {
+      // 处于加载状态时清空历史错误，避免加载完成后防抖期间显示旧的误报
+      validationErrors.value = [];
+      return;
+    }
+
+    validationTimeout = setTimeout(() => {
+      const cleanConfig = getCleanWorkflow();
+      const result = validateWorkflow(cleanConfig);
+      validationErrors.value = result.errors;
+    }, 500);
   },
   { deep: true, immediate: true }
 );
@@ -390,6 +409,7 @@ onUnmounted(() => {
     }
   }
 
+  .validation-loading,
   .validation-success {
     display: flex;
     align-items: center;

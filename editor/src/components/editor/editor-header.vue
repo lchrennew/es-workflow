@@ -12,7 +12,11 @@
 
     <!-- 校验结果弹窗 -->
     <a-modal title="配置校验结果" :open="showValidation" @cancel="showValidation = false" :footer="null">
-      <div v-if="validationErrors.length === 0" class="validation-success">
+      <div v-if="isPrefetchersLoading" class="validation-loading">
+        <loading-outlined style="color: #1890ff; font-size: 24px; margin-right: 8px;" />
+        <span>依赖数据正在加载中，请稍候...</span>
+      </div>
+      <div v-else-if="validationErrors.length === 0" class="validation-success">
         <check-circle-outlined style="color: #52c41a; font-size: 24px; margin-right: 8px;" />
         <span>校验通过，配置符合规范！</span>
       </div>
@@ -28,12 +32,13 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
-import { Modal as AModal } from 'ant-design-vue';
-import { CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons-vue';
+import { ref, watch } from 'vue';
+import { Modal as AModal, message } from 'ant-design-vue';
+import { CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined } from '@ant-design/icons-vue';
 import { workflow, getCleanWorkflow } from '../../composables/use-workflow.js';
 import { performAutoLayout } from '../../composables/workflow-ops.js';
 import { validateWorkflow } from '../../utils/validator.js';
+import { isPrefetchersLoading } from '../../composables/prefetchers.js';
 import YamlViewer from './yaml-viewer.vue';
 
 const showYaml = ref(false);
@@ -45,11 +50,21 @@ const handleAutoLayout = () => {
 };
 
 const handleValidate = () => {
+  if (isPrefetchersLoading.value) {
+    showValidation.value = true;
+    return;
+  }
   const cleanConfig = getCleanWorkflow();
   const result = validateWorkflow(cleanConfig);
   validationErrors.value = result.errors;
   showValidation.value = true;
 };
+
+watch(isPrefetchersLoading, (loading) => {
+  if (!loading && showValidation.value) {
+    handleValidate();
+  }
+});
 
 const printConfig = () => {
   // 移除为了UI展示添加的 ui 属性，只打印符合规范的 JSON
@@ -109,6 +124,7 @@ const printConfig = () => {
   }
 }
 
+.validation-loading,
 .validation-success {
   display: flex;
   align-items: center;
@@ -118,7 +134,7 @@ const printConfig = () => {
 
 .validation-error {
   padding: 10px 0;
-  
+
   .error-list {
     margin-top: 10px;
     padding-left: 20px;

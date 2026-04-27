@@ -159,7 +159,8 @@ export const validateWorkflow = (workflowConfig) => {
         }
 
         // 请求目标约束
-        if (target.state !== 'end') {
+        if (target.state !== 'end' && target.state !== 'initial') {
+          // 只在连线终点不为结束状态或开始状态时进行校验
           const hasRequestTargetsPrefetcher = (target.prefetchers || []).some(pName => {
             const p = prefetchers.find(pref => pref.name === pName);
             return p && p.spec && Array.isArray(p.spec.parameters) && p.spec.parameters.includes('TMP_REQUEST_TARGETS');
