@@ -1,5 +1,6 @@
 <template>
   <div class="canvas-board" tabindex="0" @mousedown.self="onCanvasMouseDown" @dblclick.self="onCanvasDoubleClick"
+    @click.self="onCanvasClick" @contextmenu.prevent.self="onCanvasContextMenu"
     :class="{ readonly, 'is-dragging': localCanvasState.isDragging, 'disable-animation': localCanvasState.isAnimatingDisabled }">
 
     <!-- Canvas validation indicator -->
@@ -67,7 +68,7 @@ import { computed, onMounted, onUnmounted, reactive, inject, watch, ref } from '
 import { Modal as AModal, Badge as ABadge } from 'ant-design-vue';
 import { WarningOutlined, CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined } from '@ant-design/icons-vue';
 import { validateWorkflow } from '../../utils/validator.js';
-import { workflow, getCleanWorkflow, selection as defaultSelection, drawing as globalDrawing, selectNode as defaultSelectNode, selectTransition as defaultSelectTransition, selectTargetEdge as defaultSelectTargetEdge, clearSelection as defaultClearSelection, canvasState as globalCanvasState, WORKFLOW_SELECTION_KEY, disableAnimationTemporarily } from '../../composables/use-workflow.js';
+import { workflow, getCleanWorkflow, selection as defaultSelection, drawing as globalDrawing, selectNode as defaultSelectNode, selectTransition as defaultSelectTransition, selectTargetEdge as defaultSelectTargetEdge, selectWorkflow as defaultSelectWorkflow, clearSelection as defaultClearSelection, canvasState as globalCanvasState, WORKFLOW_SELECTION_KEY, disableAnimationTemporarily } from '../../composables/use-workflow.js';
 import { addState } from '../../composables/use-workflow.js';
 import { removeNode, removeTransition, removeTarget, performAutoLayout } from '../../composables/workflow-ops.js';
 import CanvasNode from './canvas-node.vue';
@@ -76,11 +77,12 @@ import CanvasEdge from './canvas-edge.vue';
 import { emitterOptions } from '../../composables/emitters.js';
 import { prefetchers, isPrefetchersLoading } from '../../composables/prefetchers.js';
 
-const { selection, selectNode, selectTransition, selectTargetEdge, clearSelection } = inject(WORKFLOW_SELECTION_KEY, {
+const { selection, selectNode, selectTransition, selectTargetEdge, selectWorkflow, clearSelection } = inject(WORKFLOW_SELECTION_KEY, {
   selection: defaultSelection,
   selectNode: defaultSelectNode,
   selectTransition: defaultSelectTransition,
   selectTargetEdge: defaultSelectTargetEdge,
+  selectWorkflow: defaultSelectWorkflow,
   clearSelection: defaultClearSelection
 });
 
@@ -101,7 +103,9 @@ const emit = defineEmits([
   'transition-click',
   'transition-contextmenu',
   'target-click',
-  'target-contextmenu'
+  'target-contextmenu',
+  'canvas-click',
+  'canvas-contextmenu'
 ]);
 
 const localCanvasState = props.readonly ? reactive({ offsetX: 0, offsetY: 0 }) : globalCanvasState;
@@ -272,6 +276,18 @@ const onCanvasDoubleClick = (e) => {
     ui: { x, y },
     transitions: []
   });
+};
+
+const onCanvasClick = (e) => {
+  clearSelection();
+  emit('canvas-click', e);
+};
+
+const onCanvasContextMenu = (e) => {
+  if (!props.readonly) {
+    selectWorkflow();
+  }
+  emit('canvas-contextmenu', e);
 };
 
 const onNodeClick = (node) => {

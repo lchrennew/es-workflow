@@ -1,7 +1,10 @@
 <template>
   <div class="property-panel-content">
+    <!-- Workflow/工作流 编辑 -->
+    <property-panel-workflow v-if="type === 'workflow'" />
+
     <!-- Node/状态 编辑 -->
-    <property-panel-node v-if="type === 'node'" />
+    <property-panel-node v-else-if="type === 'node'" />
 
     <!-- Transition/事件 编辑 -->
     <property-panel-transition v-else-if="type === 'transition'" />
@@ -16,6 +19,7 @@
 </template>
 
 <script setup>
+import PropertyPanelWorkflow from './property-panel-workflow.vue';
 import PropertyPanelNode from './property-panel-node.vue';
 import PropertyPanelTransition from './property-panel-transition.vue';
 import PropertyPanelTargetEdge from './property-panel-target-edge.vue';

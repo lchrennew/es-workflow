@@ -39,7 +39,7 @@ const isOpen = computed(() => {
     return true;
   }
 
-  if (selection.type === 'transition' || selection.type === 'target-edge') {
+  if (selection.type === 'transition' || selection.type === 'target-edge' || selection.type === 'workflow') {
     return true;
   }
 

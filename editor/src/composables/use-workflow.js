@@ -45,6 +45,13 @@ export const createSelectionState = () => {
     localSelection.showPanel = false;
   };
 
+  const localSelectWorkflow = () => {
+    localSelection.type = 'workflow';
+    localSelection.data = workflow;
+    localSelection.parent = null;
+    localSelection.showPanel = false;
+  };
+
   const localClearSelection = () => {
     localSelection.type = null;
     localSelection.data = null;
@@ -57,6 +64,7 @@ export const createSelectionState = () => {
     selectNode: localSelectNode,
     selectTransition: localSelectTransition,
     selectTargetEdge: localSelectTargetEdge,
+    selectWorkflow: localSelectWorkflow,
     clearSelection: localClearSelection
   };
 };
@@ -231,6 +239,13 @@ export const selectTargetEdge = (transition, targetState, sourceState) => {
   selection.type = 'target-edge';
   selection.data = { transition, targetState };
   selection.parent = sourceState;
+  selection.showPanel = false;
+};
+
+export const selectWorkflow = () => {
+  selection.type = 'workflow';
+  selection.data = workflow;
+  selection.parent = null;
   selection.showPanel = false;
 };
 

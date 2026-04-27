@@ -3,7 +3,7 @@
     <editor-header />
     <div class="editor-main">
       <canvas-board @state-contextmenu="onContextMenu" @transition-contextmenu="onContextMenu"
-        @target-contextmenu="onContextMenu" />
+        @target-contextmenu="onContextMenu" @canvas-contextmenu="onContextMenu" />
       <property-panel />
     </div>
   </div>
