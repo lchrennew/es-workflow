@@ -2,10 +2,16 @@
   <header class="editor-header">
     <div class="logo">ES-Workflow Editor</div>
     <div class="actions">
-      <button class="btn-validate" @click="handleValidate">校验配置</button>
-      <button class="btn-layout" @click="handleAutoLayout">自动布局</button>
-      <button @click="showYaml = true">查看YAML</button>
-      <button @click="printConfig">打印配置</button>
+      <a-button-group>
+        <a-button @click="undo" :disabled="!canUndo()" title="撤销 (Cmd+Z)">
+          <template #icon><undo-outlined /></template>
+        </a-button>
+        <a-button @click="redo" :disabled="!canRedo()" title="重做 (Cmd+Shift+Z)">
+          <template #icon><redo-outlined /></template>
+        </a-button>
+      </a-button-group>
+      <a-button type="primary" @click="handleAutoLayout">自动布局</a-button>
+      <a-button @click="showYaml = true">查看YAML</a-button>
     </div>
 
     <yaml-viewer v-model:visible="showYaml" />
@@ -24,7 +30,7 @@
         <close-circle-outlined style="color: #f5222d; font-size: 24px; margin-right: 8px;" />
         <span style="font-weight: bold;">发现 {{ validationErrors.length }} 个配置错误：</span>
         <ul class="error-list">
-          <li v-for="(error, index) in validationErrors" :key="index">{{ error }}</li>
+          <li v-for="(error, index) in validationErrors">{{ error }}</li>
         </ul>
       </div>
     </a-modal>
@@ -33,12 +39,13 @@
 
 <script setup>
 import { ref, watch } from 'vue';
-import { Modal as AModal, message } from 'ant-design-vue';
-import { CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined } from '@ant-design/icons-vue';
+import { Modal as AModal, message, Button as AButton, ButtonGroup as AButtonGroup } from 'ant-design-vue';
+import { CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined, UndoOutlined, RedoOutlined } from '@ant-design/icons-vue';
 import { workflow, getCleanWorkflow } from '../../composables/use-workflow.js';
 import { performAutoLayout } from '../../composables/workflow-ops.js';
 import { validateWorkflow } from '../../utils/validator.js';
 import { isPrefetchersLoading } from '../../composables/prefetchers.js';
+import { undo, redo, canUndo, canRedo } from '../../composables/use-history.js';
 import YamlViewer from './yaml-viewer.vue';
 
 const showYaml = ref(false);
@@ -65,13 +72,6 @@ watch(isPrefetchersLoading, (loading) => {
     handleValidate();
   }
 });
-
-const printConfig = () => {
-  // 移除为了UI展示添加的 ui 属性，只打印符合规范的 JSON
-  const cleanWorkflow = getCleanWorkflow();
-  console.log(JSON.stringify(cleanWorkflow, null, 2));
-  alert('配置已打印到控制台，请查看！');
-};
 </script>
 
 <style lang="less" scoped>
@@ -92,35 +92,7 @@ const printConfig = () => {
   .actions {
     display: flex;
     gap: 10px;
-
-    button {
-      padding: 6px 12px;
-      background-color: #42b983;
-      border: none;
-      border-radius: 4px;
-      color: white;
-      cursor: pointer;
-
-      &:hover {
-        background-color: #3aa876;
-      }
-
-      &.btn-layout {
-        background-color: #409eff;
-
-        &:hover {
-          background-color: #66b1ff;
-        }
-      }
-
-      &.btn-validate {
-        background-color: #faad14;
-
-        &:hover {
-          background-color: #ffc53d;
-        }
-      }
-    }
+    align-items: center;
   }
 }
 

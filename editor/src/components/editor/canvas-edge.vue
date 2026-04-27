@@ -97,6 +97,7 @@ const pathD = computed(() => {
     fill: none;
     stroke: transparent;
     stroke-width: 15;
+    transition: d 0.3s ease;
   }
 
   .edge-path-animated {
@@ -104,7 +105,10 @@ const pathD = computed(() => {
     stroke: #b3c0d1;
     /* 默认灰色虚线 */
     stroke-width: 2;
-    stroke-dasharray: 6, 6;
+    transition: d 0.3s ease, stroke 0.3s ease, stroke-width 0.3s ease;
+
+    stroke-dasharray: 6,
+      6;
     animation: flow 1s linear infinite;
   }
 
@@ -135,5 +139,13 @@ const pathD = computed(() => {
   to {
     stroke-dashoffset: 0;
   }
+}
+</style>
+<style lang="less">
+.is-dragging .canvas-edge .edge-path-click-area,
+.is-dragging .canvas-edge .edge-path-animated,
+.disable-animation .canvas-edge .edge-path-click-area,
+.disable-animation .canvas-edge .edge-path-animated {
+  transition: none !important;
 }
 </style>

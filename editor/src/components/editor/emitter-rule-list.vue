@@ -23,7 +23,7 @@
       </a-dropdown>
     </div>
     <div class="rule-items">
-      <div v-for="(ruleKey, index) in modelValue" :key="ruleKey" class="rule-item" draggable="true"
+      <div v-for="(ruleKey, index) in modelValue" class="rule-item" draggable="true"
         @dragstart="onDragStart(index)" @dragover.prevent @dragenter.prevent @drop="onDrop(index)">
         <span class="drag-handle">☰</span>
         <span class="rule-title">{{ getTitle(ruleKey) }}</span>

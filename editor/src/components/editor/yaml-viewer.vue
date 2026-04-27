@@ -1,6 +1,5 @@
 <template>
-  <a-modal title="配置预览 (YAML)" :open="visible" @cancel="close" width="600px" :footer="null"
-    :bodyStyle="{ padding: 0 }">
+  <a-modal title="配置预览 (YAML)" :open="visible" @cancel="close" width="600px" :footer="null" :bodyStyle="{ padding: 0 }">
     <div class="yaml-content">
       <a-textarea readonly :value="yamlContent" :rows="20" />
     </div>

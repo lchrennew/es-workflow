@@ -1,18 +1,10 @@
 <template>
   <div class="property-panel-wrapper">
-      <a-drawer :bodyStyle="{ padding: '15px', backgroundColor: '#f8f9fa' }"
-                :closable="true"
-                :getContainer="false"
-                :headerStyle="{ backgroundColor: '#eef0f2', borderBottom: '1px solid #ddd', padding: '15px' }"
-                :mask="false"
-                :open="isOpen"
-                destroy-on-close
-                placement="right"
-                title="属性面板"
-                width="300"
-                @close="handleClose">
-          <property-panel-content :type="cachedType" />
-      </a-drawer>
+    <a-drawer :bodyStyle="{ padding: '15px', backgroundColor: '#f8f9fa' }" :closable="true" :getContainer="false"
+      :headerStyle="{ backgroundColor: '#eef0f2', borderBottom: '1px solid #ddd', padding: '15px' }" :mask="false"
+      :open="isOpen" destroy-on-close placement="right" title="属性面板" width="300" @close="handleClose">
+      <property-panel-content :type="cachedType" />
+    </a-drawer>
   </div>
 </template>
 

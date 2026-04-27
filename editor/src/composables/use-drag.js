@@ -1,9 +1,12 @@
 import { updateNodePosition, addTransition, addTarget } from './workflow-ops.js';
 import { drawing, canvasState } from './use-workflow.js';
+import { pauseRecording, resumeRecording } from './use-history.js';
 
 export const useNodeDrag = (item) => {
   return (e) => {
     if (drawing.isDrawing) return;
+    pauseRecording();
+    canvasState.isDragging = true;
     const startX = e.clientX;
     const startY = e.clientY;
     const initialX = item.ui?.x || 0;
@@ -15,8 +18,10 @@ export const useNodeDrag = (item) => {
       item.ui.y = Math.round(initialY + ev.clientY - startY);
     };
     const onMouseUp = () => {
+      canvasState.isDragging = false;
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseup', onMouseUp);
+      resumeRecording();
     };
 
     document.addEventListener('mousemove', onMouseMove);
@@ -27,6 +32,7 @@ export const useNodeDrag = (item) => {
 export const usePortDrag = (sourceType, sourceData, portType = 'default') => {
   return (e) => {
     drawing.isDrawing = true;
+    pauseRecording();
     drawing.sourceNode = sourceData;
     const rect = e.target.getBoundingClientRect();
     const boardRect = e.target.closest('.canvas-board').getBoundingClientRect();
@@ -53,10 +59,16 @@ export const usePortDrag = (sourceType, sourceData, portType = 'default') => {
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseup', onMouseUp);
 
-      if (!hasMoved) return;
+      if (!hasMoved) {
+        resumeRecording();
+        return;
+      }
 
       const targetEl = document.elementFromPoint(ev.clientX, ev.clientY);
-      if (targetEl === e.target || e.target.contains(targetEl)) return;
+      if (targetEl === e.target || e.target.contains(targetEl)) {
+        resumeRecording();
+        return;
+      }
 
       const targetNodeEl = targetEl?.closest('.canvas-node');
       if (targetNodeEl) {
@@ -69,6 +81,7 @@ export const usePortDrag = (sourceType, sourceData, portType = 'default') => {
           }
         }
       }
+      resumeRecording();
     };
 
     document.addEventListener('mousemove', onMouseMove);

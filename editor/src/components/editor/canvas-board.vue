@@ -1,6 +1,6 @@
 <template>
   <div class="canvas-board" tabindex="0" @mousedown.self="onCanvasMouseDown" @dblclick.self="onCanvasDoubleClick"
-    :class="{ readonly }">
+    :class="{ readonly, 'is-dragging': localCanvasState.isDragging, 'disable-animation': localCanvasState.isAnimatingDisabled }">
 
     <!-- Canvas validation indicator -->
     <div class="canvas-validator-indicator" @click="showValidation = true" v-if="!readonly">
@@ -31,7 +31,7 @@
         <close-circle-outlined style="color: #f5222d; font-size: 24px; margin-right: 8px;" />
         <span style="font-weight: bold;">发现 {{ validationErrors.length }} 个配置错误：</span>
         <ul class="error-list">
-          <li v-for="(error, index) in validationErrors" :key="index">{{ error }}</li>
+          <li v-for="(error, index) in validationErrors">{{ error }}</li>
         </ul>
       </div>
     </a-modal>
@@ -39,7 +39,7 @@
     <svg class="edges-layer" style="overflow: visible;">
       <g :transform="`translate(${localCanvasState.offsetX}, ${localCanvasState.offsetY})`">
         <!-- Edges -->
-        <canvas-edge v-for="edge in edges" :key="edge.id" :edge="edge" @click="onEdgeClick(edge)"
+        <canvas-edge v-for="edge in edges" :edge="edge" @click="onEdgeClick(edge)"
           @contextmenu.prevent="onEdgeContextMenu(edge)" />
         <!-- Drawing Line -->
         <line v-if="localDrawing.isDrawing && !readonly" :x1="localDrawing.startX" :y1="localDrawing.startY"
@@ -50,13 +50,12 @@
     <div class="nodes-layer"
       :style="{ transform: `translate(${localCanvasState.offsetX}px, ${localCanvasState.offsetY}px)` }">
       <!-- Nodes -->
-      <canvas-node v-for="state in currentWorkflow.spec.states" :key="`node-${state.name}`" :node="state"
-        :readonly="readonly" @click="onNodeClick(state)" @contextmenu.prevent="onNodeContextMenu(state)" />
+      <canvas-node v-for="state in currentWorkflow.spec.states" :node="state" :readonly="readonly"
+        @click="onNodeClick(state)" @contextmenu.prevent="onNodeContextMenu(state)" />
       <!-- Transitions -->
-      <template v-for="state in currentWorkflow.spec.states" :key="`transitions-${state.name}`">
-        <canvas-transition v-for="transition in state.transitions" :key="`trans-${state.name}-${transition.event}`"
-          :transition="transition" :sourceState="state" :readonly="readonly"
-          @click="onTransitionClick(transition, state)"
+      <template v-for="state in currentWorkflow.spec.states">
+        <canvas-transition v-for="transition in state.transitions" :transition="transition" :sourceState="state"
+          :readonly="readonly" @click="onTransitionClick(transition, state)"
           @contextmenu.prevent="onTransitionContextMenu(transition, state)" />
       </template>
     </div>
@@ -68,7 +67,7 @@ import { computed, onMounted, onUnmounted, reactive, inject, watch, ref } from '
 import { Modal as AModal, Badge as ABadge } from 'ant-design-vue';
 import { WarningOutlined, CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined } from '@ant-design/icons-vue';
 import { validateWorkflow } from '../../utils/validator.js';
-import { workflow, getCleanWorkflow, selection as defaultSelection, drawing as globalDrawing, selectNode as defaultSelectNode, selectTransition as defaultSelectTransition, selectTargetEdge as defaultSelectTargetEdge, clearSelection as defaultClearSelection, canvasState as globalCanvasState, WORKFLOW_SELECTION_KEY } from '../../composables/use-workflow.js';
+import { workflow, getCleanWorkflow, selection as defaultSelection, drawing as globalDrawing, selectNode as defaultSelectNode, selectTransition as defaultSelectTransition, selectTargetEdge as defaultSelectTargetEdge, clearSelection as defaultClearSelection, canvasState as globalCanvasState, WORKFLOW_SELECTION_KEY, disableAnimationTemporarily } from '../../composables/use-workflow.js';
 import { addState } from '../../composables/use-workflow.js';
 import { removeNode, removeTransition, removeTarget, performAutoLayout } from '../../composables/workflow-ops.js';
 import CanvasNode from './canvas-node.vue';
@@ -219,11 +218,26 @@ const edges = computed(() => {
   return result;
 });
 
+watch(
+  [
+    () => currentWorkflow.value?.spec?.states?.length,
+    () => edges.value.length
+  ],
+  (newVals, oldVals) => {
+    if (oldVals[0] !== undefined && oldVals[1] !== undefined) {
+      if (newVals[0] !== oldVals[0] || newVals[1] !== oldVals[1]) {
+        disableAnimationTemporarily();
+      }
+    }
+  }
+);
+
 const onCanvasMouseDown = (e) => {
   e.preventDefault();
   // Clear selection if we click on background
   clearSelection();
 
+  localCanvasState.isDragging = true;
   const startX = e.clientX;
   const startY = e.clientY;
   const initialX = localCanvasState.offsetX;
@@ -235,6 +249,7 @@ const onCanvasMouseDown = (e) => {
   };
 
   const onMouseUp = () => {
+    localCanvasState.isDragging = false;
     document.removeEventListener('mousemove', onMouseMove);
     document.removeEventListener('mouseup', onMouseUp);
   };

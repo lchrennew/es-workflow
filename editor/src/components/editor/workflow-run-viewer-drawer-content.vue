@@ -25,7 +25,7 @@
     <!-- 请求与响应列表 -->
     <div class="requests-section" v-if="nodeData.runStatus?.requests?.length">
       <div class="section-title">处理记录</div>
-      <div class="request-item" v-for="req in nodeData.runStatus.requests" :key="req.id">
+      <div class="request-item" v-for="req in nodeData.runStatus.requests">
         <div class="req-header">
           <span class="target">{{ req.target }}</span>
           <span class="time">{{ formatTime(getTimestampFromId(req.id) || req.createdAt) }}</span>

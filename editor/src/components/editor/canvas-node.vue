@@ -143,6 +143,7 @@ const onConditionPortMouseDown = (e) => {
   pointer-events: auto;
   user-select: none;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  transition: left 0.3s ease, top 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 
   &.selected {
     border-color: #42b983;
@@ -260,5 +261,11 @@ const onConditionPortMouseDown = (e) => {
       }
     }
   }
+}
+</style>
+<style lang="less">
+.is-dragging .canvas-node,
+.disable-animation .canvas-node {
+  transition: none !important;
 }
 </style>

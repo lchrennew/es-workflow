@@ -18,7 +18,7 @@
 
         <a-form-item label="规则集" name="emitter" :rules="[{ required: true, message: '请选择规则集' }]">
           <a-select v-model:value="formData.emitter" placeholder="-- 请选择 --" allow-clear @change="onEmitterChange">
-            <a-select-option v-for="option in userSelectableEmitters" :key="option.name" :value="option.name">
+            <a-select-option v-for="option in userSelectableEmitters" :value="option.name">
               {{ option.metadata.title }}
             </a-select-option>
           </a-select>

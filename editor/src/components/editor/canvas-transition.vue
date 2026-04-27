@@ -107,6 +107,7 @@ const onPortMouseDown = (e) => {
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: left 0.3s ease, top 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 
   &.selected {
     border-color: #42b983;
@@ -183,5 +184,11 @@ const onPortMouseDown = (e) => {
       }
     }
   }
+}
+</style>
+<style lang="less">
+.is-dragging .canvas-transition,
+.disable-animation .canvas-transition {
+  transition: none !important;
 }
 </style>

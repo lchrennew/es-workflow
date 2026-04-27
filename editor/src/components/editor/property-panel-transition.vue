@@ -29,7 +29,7 @@
       <a-form layout="vertical" :model="formData">
         <a-form-item label="事件">
           <a-select v-model:value="formData.event" placeholder="-- 请选择 --">
-            <a-select-option v-for="evt in availableEvents" :key="evt.name" :value="evt.name">
+            <a-select-option v-for="evt in availableEvents" :value="evt.name">
               {{ evt.title }}
             </a-select-option>
           </a-select>

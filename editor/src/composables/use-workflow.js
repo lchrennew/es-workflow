@@ -72,8 +72,21 @@ export const drawing = reactive({
 
 export const canvasState = reactive({
   offsetX: 0,
-  offsetY: 0
+  offsetY: 0,
+  isDragging: false,
+  isAnimatingDisabled: false
 });
+
+let animationTimeout = null;
+
+export const disableAnimationTemporarily = () => {
+  canvasState.isAnimatingDisabled = true;
+  if (animationTimeout) clearTimeout(animationTimeout);
+  // Use a slight delay to ensure DOM is updated and painted before re-enabling transitions
+  animationTimeout = setTimeout(() => {
+    canvasState.isAnimatingDisabled = false;
+  }, 100);
+};
 
 export const reorderStates = () => {
   if (workflow.spec && workflow.spec.states) {
