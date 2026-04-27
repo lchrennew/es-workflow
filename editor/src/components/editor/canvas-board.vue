@@ -45,6 +45,14 @@
         <!-- Drawing Line -->
         <line v-if="localDrawing.isDrawing && !readonly" :x1="localDrawing.startX" :y1="localDrawing.startY"
           :x2="localDrawing.currentX" :y2="localDrawing.currentY" class="drawing-line" />
+
+        <!-- Alignment Lines -->
+        <template v-if="!readonly && localCanvasState.alignmentLines && localCanvasState.alignmentLines.length > 0">
+          <line v-for="(line, index) in localCanvasState.alignmentLines"
+            :x1="line.type === 'vertical' ? line.x : -10000" :y1="line.type === 'horizontal' ? line.y : -10000"
+            :x2="line.type === 'vertical' ? line.x : 10000" :y2="line.type === 'horizontal' ? line.y : 10000"
+            stroke="#1890ff" stroke-width="1" stroke-dasharray="5,5" class="alignment-line" />
+        </template>
       </g>
     </svg>
 

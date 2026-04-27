@@ -82,7 +82,8 @@ export const canvasState = reactive({
   offsetX: 0,
   offsetY: 0,
   isDragging: false,
-  isAnimatingDisabled: false
+  isAnimatingDisabled: false,
+  alignmentLines: []
 });
 
 let animationTimeout = null;

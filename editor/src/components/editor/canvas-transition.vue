@@ -1,6 +1,6 @@
 <template>
-  <div class="canvas-transition" :class="transitionClasses" :style="transitionStyle" @mousedown="onMouseDown"
-    :title="displayTitle">
+  <div class="canvas-transition" :data-id="`${sourceState.name}-${transition.event}`" :class="transitionClasses"
+    :style="transitionStyle" @mousedown="onMouseDown" :title="displayTitle">
     <div class="transition-title">{{ displayTitle }}</div>
     <div class="node-ports" v-if="!readonly">
       <div class="port out-port" @mousedown.stop="onPortMouseDown"></div>
