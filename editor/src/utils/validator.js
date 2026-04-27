@@ -1,5 +1,6 @@
 import { getCleanWorkflow } from '../composables/use-workflow.js';
 import { getEventDisplayName } from '../composables/emitters.js';
+import { prefetchers } from '../composables/prefetchers.js';
 
 export const validateWorkflow = (workflowConfig) => {
   const errors = [];
@@ -155,6 +156,17 @@ export const validateWorkflow = (workflowConfig) => {
         // initial 不能作为目标
         if (target.state === 'initial') {
           errors.push('开始节点只能作为连线的起点，不能作为连线的终点。');
+        }
+
+        // 请求目标约束
+        if (target.state !== 'end') {
+          const hasRequestTargetsPrefetcher = (target.prefetchers || []).some(pName => {
+            const p = prefetchers.find(pref => pref.name === pName);
+            return p && p.spec && Array.isArray(p.spec.parameters) && p.spec.parameters.includes('TMP_REQUEST_TARGETS');
+          });
+          if (!hasRequestTargetsPrefetcher) {
+            errors.push(`“${stateDisplayName}”节点通过“${eventDisplayName}”事件连接到“${targetDisplayName}”节点，该连线的预取器中至少需要包含一个能产出“请求目标（TMP_REQUEST_TARGETS）”的预取器。`);
+          }
         }
 
         // prefetcher 去重

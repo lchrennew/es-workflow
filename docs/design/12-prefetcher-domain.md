@@ -39,6 +39,7 @@ class PrefetcherMetadata {
 }
 
 class PrefetcherSpec {
+  +List~String~ parameters
   +String script
 }
 
@@ -59,6 +60,11 @@ MetadataBase <|-- PrefetcherMetadata
 - 使用 `PrefetcherMetadata`（继承自 `MetadataBase`：标题、tags、审计字段、版本 ObjectId 等）
 
 ### spec
+- `parameters`：参数声明（可选）  
+  - 含义：显式声明该 prefetcher **可能写入/产出的参数 key 列表**（用于 UI 展示、配置治理与冲突检测）
+  - 约束建议：每个 key 必须满足参数命名规则（见 Workflow 参数命名规则章节：大写字母/数字/下划线）
+  - 说明：该字段不影响运行语义；实际写入以脚本返回的 `result` 为准
+  - 设计说明：`parameters` 仅用于“参数 key 声明”。若未来 prefetcher 产出除参数外的其他数据，应通过新增字段（例如 `outputs/artifacts`）承载（见 ADR-023）
 - `script`：脚本文本（必填；运行时默认按 JavaScript 执行）  
   - 约定：`script` 仅填写 **content**（函数体内容）。运行时会将其包装为：
     ```js
@@ -94,6 +100,8 @@ metadata:
   tags:
     - demo/example
 spec:
+  parameters:
+    - TMP_REQUEST_TARGETS
   script: |
     // 注意：这里仅填写 content，会被运行时包装进：
     // async (run, task, target, parameters, api) => { const result = {}; ...; return result }

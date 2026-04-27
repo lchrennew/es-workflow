@@ -24,6 +24,8 @@
 - [ADR-020：引入 EmitterRule 领域模型以复用“判定规则”](./decisions/ADR-020.md)
 - [ADR-021：在 WorkflowTask 上增加 source（parent + event）以增强可追溯性](./decisions/ADR-021.md)
 - [ADR-022：在 WorkflowTask 上增加 endEvent 记录任务结束事件](./decisions/ADR-022.md)
+- [ADR-023：Prefetcher 参数声明字段命名为 parameters](./decisions/ADR-023.md)
+- [ADR-024：进入非 end 状态的迁移 target 必须配置“产出 TMP_REQUEST_TARGETS 的 prefetcher”](./decisions/ADR-024.md)
 
 ## 历史（已废弃，仅保留用于追溯）
 

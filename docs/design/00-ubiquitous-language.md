@@ -43,6 +43,7 @@
 - 含义：用于在 Task 进入 InProgress 时生成 request 列表的临时参数。
 - 位置：`task.inputParameters["TMP_REQUEST_TARGETS"]`
 - 值：以英文逗号 `,` 分隔的 target 列表（字符串）
+- 约束（配置域）：进入非 `end` 状态的迁移 target 应配置至少一个会产出该参数的 prefetcher（即 prefetcher.spec.parameters 包含 `TMP_REQUEST_TARGETS`），用于支撑 request/response 驱动模型。
 
 ### Workflow Run（工作流实例/运行）
 - 含义：Workflow 被启动后，在运行期产生的一次“运行”（一个可推进、可结束的执行体）。
@@ -140,7 +141,9 @@
 - 含义：独立业务领域中的配置实体，用于在运行期“先取数/派生数据”，供任务门控、处理、脚本判断使用。
 - 配置结构：`kind/name/metadata/spec`
 - kind（已确认）：`prefetcher`
-- spec：仅包含 `script`（运行时默认按 JavaScript 执行；script 仅填写 content，运行时按统一函数签名包装）
+- spec：
+  - `parameters`（可选）：显式声明该 prefetcher 可能产出的参数 key 列表（用于 UI 展示与冲突检测）
+  - `script`：运行时默认按 JavaScript 执行；script 仅填写 content，运行时按统一函数签名包装
 - 引用方式：Workflow 配置中的 `WorkflowTransitionTarget.prefetchers[*]` 引用 `Prefetcher.name`
 
 ### Emitter.allowedActions（对外可执行操作清单）

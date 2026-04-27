@@ -1,21 +1,21 @@
 <template>
-  <div class="emitter-rule-list">
+  <div class="prefetcher-list">
     <div class="add-btn-wrap">
       <a-dropdown :trigger="['click']" v-model:open="dropdownOpen">
         <a-button type="dashed" block>
-          + 添加判定规则
+          + 添加预取器
         </a-button>
         <template #overlay>
           <div class="dropdown-overlay">
             <div class="search-wrap" @click.stop>
-              <a-input v-model:value="searchKeyword" placeholder="搜索规则名称或标识" allow-clear />
+              <a-input v-model:value="searchKeyword" placeholder="搜索预取器名称或标识" allow-clear />
             </div>
             <a-menu @click="handleAdd" class="dropdown-menu">
-              <a-menu-item v-for="opt in filteredOptions" :key="opt.key">
-                {{ opt.metadata.title }} ({{ opt.key }})
+              <a-menu-item v-for="opt in filteredOptions" :key="opt.value">
+                {{ opt.label }} ({{ opt.value }})
               </a-menu-item>
               <a-menu-item v-if="filteredOptions.length === 0" disabled>
-                无匹配规则
+                无匹配预取器
               </a-menu-item>
             </a-menu>
           </div>
@@ -39,7 +39,7 @@ import { Dropdown as ADropdown, Menu as AMenu, MenuItem as AMenuItem, Button as 
 
 const props = defineProps({
   modelValue: { type: Array, default: () => [] },
-  options: { type: Array, default: () => [] }
+  options: { type: Array, default: () => [] } // options has { label, value }
 });
 const emit = defineEmits(['update:modelValue']);
 
@@ -50,19 +50,19 @@ watch(dropdownOpen, (val) => {
   if (!val) searchKeyword.value = '';
 });
 
-const unselectedOptions = computed(() => props.options.filter(opt => !props.modelValue.includes(opt.key)));
+const unselectedOptions = computed(() => props.options.filter(opt => !props.modelValue.includes(opt.value)));
 
 const filteredOptions = computed(() => {
   const kw = searchKeyword.value.trim().toLowerCase();
   if (!kw) return unselectedOptions.value;
   return unselectedOptions.value.filter(opt =>
-    opt.key.toLowerCase().includes(kw) || (opt.metadata?.title || '').toLowerCase().includes(kw)
+    opt.value.toLowerCase().includes(kw) || (opt.label || '').toLowerCase().includes(kw)
   );
 });
 
 const getTitle = (key) => {
-  const opt = props.options.find(o => o.key === key);
-  return opt ? opt.metadata.title : key;
+  const opt = props.options.find(o => o.value === key);
+  return opt ? opt.label : key;
 };
 
 const handleAdd = ({ key }) => {
@@ -89,7 +89,7 @@ const onDrop = (dropIndex) => {
 </script>
 
 <style lang="less" scoped>
-.emitter-rule-list {
+.prefetcher-list {
   .add-btn-wrap {
     margin-bottom: 8px;
   }
