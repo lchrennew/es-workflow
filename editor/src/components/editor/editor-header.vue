@@ -1,6 +1,6 @@
 <template>
   <header class="editor-header">
-    <div class="logo">ES-Workflow Editor</div>
+    <div class="logo">{{ displayTitle }}</div>
     <div class="actions">
       <a-button-group>
         <a-button @click="undo" :disabled="!canUndo()" title="撤销 (Cmd+Z)">
@@ -38,7 +38,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 import { Modal as AModal, message, Button as AButton, ButtonGroup as AButtonGroup } from 'ant-design-vue';
 import { CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined, UndoOutlined, RedoOutlined } from '@ant-design/icons-vue';
 import { workflow, getCleanWorkflow } from '../../composables/use-workflow.js';
@@ -47,6 +47,8 @@ import { validateWorkflow } from '../../utils/validator.js';
 import { isPrefetchersLoading } from '../../composables/prefetchers.js';
 import { undo, redo, canUndo, canRedo } from '../../composables/use-history.js';
 import YamlViewer from './yaml-viewer.vue';
+
+const displayTitle = computed(() => workflow.metadata?.title || workflow.name || 'ES-Workflow Editor');
 
 const showYaml = ref(false);
 const showValidation = ref(false);
@@ -77,8 +79,9 @@ watch(isPrefetchersLoading, (loading) => {
 <style lang="less" scoped>
 .editor-header {
   height: 50px;
-  background-color: #2c3e50;
-  color: white;
+  background-color: #ffffff;
+  color: #333333;
+  border-bottom: 1px solid #e8e8e8;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -87,6 +90,7 @@ watch(isPrefetchersLoading, (loading) => {
   .logo {
     font-size: 18px;
     font-weight: bold;
+    color: #1890ff;
   }
 
   .actions {
