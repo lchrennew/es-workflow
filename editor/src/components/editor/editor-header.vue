@@ -58,13 +58,13 @@ const handleAutoLayout = () => {
   performAutoLayout();
 };
 
-const handleValidate = () => {
+const handleValidate = async () => {
   if (isPrefetchersLoading.value) {
     showValidation.value = true;
     return;
   }
   const cleanConfig = getCleanWorkflow();
-  const result = validateWorkflow(cleanConfig);
+  const result = await validateWorkflow(cleanConfig);
   validationErrors.value = result.errors;
   showValidation.value = true;
 };

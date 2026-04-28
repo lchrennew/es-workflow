@@ -3,7 +3,7 @@
     <editor-header />
     <div class="editor-main">
       <canvas-board @state-contextmenu="onContextMenu" @transition-contextmenu="onContextMenu"
-        @target-contextmenu="onContextMenu" @canvas-contextmenu="onContextMenu" />
+        @target-contextmenu="onContextMenu" @canvas-contextmenu="onContextMenu" @validate="handleValidate" />
       <property-panel />
     </div>
   </div>
@@ -20,26 +20,13 @@ import EditorHeader from './editor-header.vue';
 import CanvasBoard from './canvas-board.vue';
 import PropertyPanel from './property-panel.vue';
 
-const props = defineProps({
-  value: {
-    type: String,
-    default: ''
-  },
-  fetchEmitters: {
-    type: Function,
-    default: null
-  },
-  fetchEmitterRules: {
-    type: Function,
-    default: null
-  },
-  fetchPrefetchers: {
-    type: Function,
-    default: null
-  }
-});
+const value = defineModel('value', { type: String, default: '' });
 
-const emit = defineEmits(['update:value']);
+const props = defineProps({
+  fetchEmitters: { type: Function, default: null },
+  fetchEmitterRules: { type: Function, default: null },
+  fetchPrefetchers: { type: Function, default: null }
+});
 
 const selectionState = createSelectionState();
 provide(WORKFLOW_SELECTION_KEY, selectionState);
@@ -47,12 +34,18 @@ const { selection } = selectionState;
 
 let isUpdatingInternal = false;
 
+const emit = defineEmits(['validate']);
+
 const onContextMenu = () => {
   selection.showPanel = true;
 };
 
+const handleValidate = (valid) => {
+  emit('validate', valid);
+};
+
 // 当组件接收到外部传入的 yaml 时进行解析和加载
-watch(() => props.value, (newYaml) => {
+watch(() => value.value, (newYaml) => {
   if (isUpdatingInternal) {
     // 由内部触发的更新，忽略外部监听
     return;
@@ -75,7 +68,7 @@ watch(workflow, () => {
     const cleanWorkflow = getCleanWorkflow();
 
     const yamlString = stringify(cleanWorkflow);
-    emit('update:value', yamlString);
+    value.value = yamlString;
   } catch (e) {
     console.error('Failed to stringify workflow data to YAML:', e);
   } finally {

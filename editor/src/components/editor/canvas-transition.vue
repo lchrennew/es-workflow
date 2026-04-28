@@ -17,9 +17,9 @@ import { getEventDisplayName, emitterOptions } from '../../composables/emitters.
 const { selection } = inject(WORKFLOW_SELECTION_KEY, { selection: defaultSelection });
 
 const props = defineProps({
-  transition: Object,
-  sourceState: Object,
-  readonly: Boolean
+  transition: { type: Object, default: () => ({}) },
+  sourceState: { type: Object, default: () => ({}) },
+  readonly: { type: Boolean, default: false }
 });
 
 const isSelected = computed(() => selection.type === 'transition' && selection.data === props.transition);

@@ -158,10 +158,11 @@ WorkflowTransition *-- WorkflowTransitionTarget : targets
 10. **请求目标约束（用于 request/response 驱动模型）**：对任一 `transition.targets[*]`，若其 `target.state != "end"`，则 `target.prefetchers` 至少包含 1 个“会产出 `TMP_REQUEST_TARGETS` 参数”的 prefetcher
    - 判定方式：该 prefetcher 的配置中 `spec.parameters` 包含 `TMP_REQUEST_TARGETS`（见 `12-prefetcher-domain.md`）
    - 含义：进入非 end 状态前必须准备好 request 目标列表，从而在 Task 进入 `in-progress` 时能生成 requests（见 ADR-018）
-11. **可达性约束：除 `end` 外的所有状态，都必须存在一条“到达 end 的路径”**（在忽略事件触发条件的静态图上做校验）
+11. **可达性约束（静态图校验）**（在忽略事件触发条件的静态图上做校验）
    - 定义有向图：节点为 `spec.states[*].name`；若存在任一 `transition.targets[*].state = B`，则认为从 A 到 B 有一条边
-   - 约束：对任一状态 `S != end`，在该图上必须存在从 `S` 到 `end` 的路径
-   - 含义：允许存在环路/自循环，但任何环路都必须存在可最终通向 `end` 的出口；避免出现“闭环孤岛”导致运行永远无法结束
+   - 约束A（从 initial 可达）：对任一状态 `S != initial`，在该图上必须存在从 `initial` 到 `S` 的路径（避免存在永远不可达的“孤岛节点”）
+   - 约束B（可达 end）：对任一状态 `S != end`，在该图上必须存在从 `S` 到 `end` 的路径（允许环路/自循环，但环路必须有通向 `end` 的出口，避免“闭环孤岛”导致运行永远无法结束）
+   - 推论：该约束在图论意义上已经蕴含“非 initial 状态至少有入边、非 end 状态至少有出边”，因此无需重复声明
 12. 初始状态约定：必须存在且仅存在一个保留状态 `name="initial"`，并且该状态**用户不可删除、不可修改**（由系统保留）
 13. 结束状态约定：必须存在且仅存在一个保留状态 `name="end"`，并且该状态**用户不可删除、不可修改**（由系统保留）
 14. **强制约束：开始/结束状态的迁移规则**
@@ -170,11 +171,7 @@ WorkflowTransition *-- WorkflowTransitionTarget : targets
    - 开始状态（`initial`）**至少有 1 个外发迁移**
    - 开始状态（`initial`）**不允许配置任何 `conditions`**（必须为空或不存在）
    - 结束状态（`end`）**只能进不能出**：`end.transitions` 必须为空（或不存在）
-   - 结束状态（`end`）**至少有 1 个入边**：至少存在一条迁移的某个 target 指向 `end`
    - 结束状态（`end`）**不允许配置任何 `conditions`**（必须为空或不存在）
-   - 除 `initial/end` 之外的其他状态：**至少有 1 个入边且至少有 1 个出边**
-     - 入边：至少存在一条迁移的某个 target 指向该状态
-     - 出边：该状态的 `transitions` 至少包含 1 条外发迁移
 15. **强制约束：开始/结束状态的运行期语义**
    - `initial`：其 Task **创建即完成**，并通过系统调用执行一次 emitterRules 产出事件 `"start"`（用于进入后续状态；默认可用 `system/start/auto-start`）
    - `end`：其 Task **创建即完成**，并驱动 WorkflowRun 结束（Completed）

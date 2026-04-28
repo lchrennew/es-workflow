@@ -24,14 +24,8 @@ import { createSelectionState, WORKFLOW_SELECTION_KEY } from '../../composables/
 import { updateEmitters } from '../../composables/emitters.js';
 
 const props = defineProps({
-  workflowRun: {
-    type: Object,
-    required: true
-  },
-  fetchEmitters: {
-    type: Function,
-    default: null
-  }
+  workflowRun: { type: Object, required: true },
+  fetchEmitters: { type: Function, default: null }
 });
 
 const selectionState = createSelectionState();

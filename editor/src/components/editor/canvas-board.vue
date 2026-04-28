@@ -95,14 +95,8 @@ const { selection, selectNode, selectTransition, selectTargetEdge, selectWorkflo
 });
 
 const props = defineProps({
-  workflowData: {
-    type: Object,
-    default: null
-  },
-  readonly: {
-    type: Boolean,
-    default: false
-  }
+  workflowData: { type: Object, default: null },
+  readonly: { type: Boolean, default: false }
 });
 
 const emit = defineEmits([
@@ -113,7 +107,8 @@ const emit = defineEmits([
   'target-click',
   'target-contextmenu',
   'canvas-click',
-  'canvas-contextmenu'
+  'canvas-contextmenu',
+  'validate'
 ]);
 
 const localCanvasState = props.readonly ? reactive({ offsetX: 0, offsetY: 0 }) : globalCanvasState;
@@ -142,10 +137,11 @@ watch(
       return;
     }
 
-    validationTimeout = setTimeout(() => {
+    validationTimeout = setTimeout(async () => {
       const cleanConfig = getCleanWorkflow();
-      const result = validateWorkflow(cleanConfig);
+      const result = await validateWorkflow(cleanConfig);
       validationErrors.value = result.errors;
+      emit('validate', result.valid);
     }, 500);
   },
   { deep: true, immediate: true }

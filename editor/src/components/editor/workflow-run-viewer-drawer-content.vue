@@ -61,10 +61,7 @@ import { parseObjectID } from 'es-object-id';
 import { emitterOptions, getEventDisplayName } from '../../composables/emitters.js';
 
 const props = defineProps({
-  selectedNode: {
-    type: Object,
-    default: () => null
-  }
+  selectedNode: { type: Object, default: () => null }
 });
 
 const nodeData = ref(props.selectedNode);

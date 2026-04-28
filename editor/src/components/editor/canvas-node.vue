@@ -23,7 +23,10 @@ import { emitterOptions } from '../../composables/emitters.js';
 
 const { selection } = inject(WORKFLOW_SELECTION_KEY, { selection: defaultSelection });
 
-const props = defineProps({ node: Object, readonly: Boolean });
+const props = defineProps({
+  node: { type: Object, default: () => ({}) },
+  readonly: { type: Boolean, default: false }
+});
 
 const isSelected = computed(() => selection.type === 'node' && selection.data?.name === props.node.name);
 const isSystem = computed(() => props.node.name === 'initial' || props.node.name === 'end');

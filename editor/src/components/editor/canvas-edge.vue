@@ -17,10 +17,7 @@ import { selection as defaultSelection, WORKFLOW_SELECTION_KEY } from '../../com
 const { selection } = inject(WORKFLOW_SELECTION_KEY, { selection: defaultSelection });
 
 const props = defineProps({
-  edge: {
-    type: Object,
-    required: true
-  }
+  edge: { type: Object, required: true }
 });
 
 const emit = defineEmits(['click']);

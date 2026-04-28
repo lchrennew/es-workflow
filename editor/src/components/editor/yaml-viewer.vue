@@ -13,12 +13,11 @@ import { stringify } from 'yaml';
 import { workflow, getCleanWorkflow } from '../../composables/use-workflow.js';
 
 
-const props = defineProps({ visible: Boolean });
-const emit = defineEmits(['update:visible']);
-const close = () => emit('update:visible', false);
+const visible = defineModel('visible', { type: Boolean, default: false });
+const close = () => { visible.value = false; };
 
 const yamlContent = computed(() => {
-  if (!props.visible) return '';
+  if (!visible.value) return '';
   const cleanWorkflow = getCleanWorkflow();
   return stringify(cleanWorkflow);
 });

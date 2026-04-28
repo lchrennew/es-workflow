@@ -23,8 +23,8 @@
       </a-dropdown>
     </div>
     <div class="rule-items">
-      <div v-for="(ruleKey, index) in modelValue" class="rule-item" draggable="true"
-        @dragstart="onDragStart(index)" @dragover.prevent @dragenter.prevent @drop="onDrop(index)">
+      <div v-for="(ruleKey, index) in modelValue" class="rule-item" draggable="true" @dragstart="onDragStart(index)"
+        @dragover.prevent @dragenter.prevent @drop="onDrop(index)">
         <span class="drag-handle">☰</span>
         <span class="rule-title">{{ getTitle(ruleKey) }}</span>
         <span class="rule-remove" @click="handleRemove(index)">✕</span>
@@ -37,11 +37,11 @@
 import { computed, ref, watch } from 'vue';
 import { Dropdown as ADropdown, Menu as AMenu, MenuItem as AMenuItem, Button as AButton, Input as AInput } from 'ant-design-vue';
 
+const modelValue = defineModel('modelValue', { type: Array, default: () => [] });
+
 const props = defineProps({
-  modelValue: { type: Array, default: () => [] },
   options: { type: Array, default: () => [] } // options has { label, value }
 });
-const emit = defineEmits(['update:modelValue']);
 
 const dropdownOpen = ref(false);
 const searchKeyword = ref('');
@@ -50,7 +50,7 @@ watch(dropdownOpen, (val) => {
   if (!val) searchKeyword.value = '';
 });
 
-const unselectedOptions = computed(() => props.options.filter(opt => !props.modelValue.includes(opt.value)));
+const unselectedOptions = computed(() => props.options.filter(opt => !modelValue.value.includes(opt.value)));
 
 const filteredOptions = computed(() => {
   const kw = searchKeyword.value.trim().toLowerCase();
@@ -66,24 +66,26 @@ const getTitle = (key) => {
 };
 
 const handleAdd = ({ key }) => {
-  emit('update:modelValue', [...props.modelValue, key]);
+  modelValue.value = [...modelValue.value, key];
   dropdownOpen.value = false;
 };
 
 const handleRemove = (index) => {
-  const newVal = [...props.modelValue];
+  const newVal = [...modelValue.value];
   newVal.splice(index, 1);
-  emit('update:modelValue', newVal);
+  modelValue.value = newVal;
 };
 
 const dragIndex = ref(-1);
-const onDragStart = (index) => dragIndex.value = index;
+const onDragStart = (index) => {
+  dragIndex.value = index;
+};
 const onDrop = (dropIndex) => {
   if (dragIndex.value === -1 || dragIndex.value === dropIndex) return;
-  const newVal = [...props.modelValue];
+  const newVal = [...modelValue.value];
   const item = newVal.splice(dragIndex.value, 1)[0];
   newVal.splice(dropIndex, 0, item);
-  emit('update:modelValue', newVal);
+  modelValue.value = newVal;
   dragIndex.value = -1;
 };
 </script>

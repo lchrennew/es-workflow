@@ -24,8 +24,8 @@ import PropertyPanelNode from './property-panel-node.vue';
 import PropertyPanelTransition from './property-panel-transition.vue';
 import PropertyPanelTargetEdge from './property-panel-target-edge.vue';
 
-defineProps({
-  type: String
+const props = defineProps({
+  type: { type: String, default: '' }
 });
 </script>
 
