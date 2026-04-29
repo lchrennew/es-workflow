@@ -16,7 +16,7 @@
   "dependencies": {
     "dayjs": "^1.11.20",
     "es-fetch-api": "^2.0.2",
-    "es-ioredis-url": "^1.0.12",
+    "es-ioredis-url": "^1.0.13",
     "es-object-id": "^1.0.0",
     "koa-es-template": "^1.0.51",
     "yaml": "^3.0.0-0",

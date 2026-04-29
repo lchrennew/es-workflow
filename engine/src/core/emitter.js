@@ -1,12 +1,11 @@
-import { redis } from "../utils/redis.js";
-import * as YAML from "yaml";
 import { exportName, importNamespace } from "../utils/imports.js";
 import { staticClone } from "../utils/objects.js";
 import { emitRunEvent } from "./run.js";
 import api from "../utils/api.js";
+import DataSource from "../plugins/data-source/data-source.js";
 
-export const saveEmitter = emitter => redis.set(`emitter:${ emitter.name }`, YAML.stringify(emitter));
-export const getEmitter = async name => YAML.parse(await redis.get(`emitter:${ name }`));
+export const saveEmitter = emitter => DataSource.configs.save(emitter);
+export const getEmitter = name => DataSource.configs.getOne('workflow-transition-emitter', name);
 
 export const executeEmitter = async (state, { run, task, request }) => {
     const { emitter, emitterRules: names } = state
@@ -22,13 +21,9 @@ export const executeEmitter = async (state, { run, task, request }) => {
     }
 }
 
-export const saveEmitterRule = rule => redis.set(`emitter-rule:${ rule.name }`, YAML.stringify(rule));
-export const getEmitterRule = async name => YAML.parse(await redis.get(`emitter-rule:${ name }`));
-export const getEmitterRules = async names => {
-    if (!names?.length) return [];
-    const keys = names.map(name => `emitter-rule:${ name }`);
-    return (await redis.mget(...keys)).map(ruleString => YAML.parse(ruleString));
-}
+export const saveEmitterRule = rule => DataSource.configs.save(rule);
+export const getEmitterRule = name => DataSource.configs.getOne('emitter-rule', name);
+export const getEmitterRules = async names => DataSource.configs.getMultiple('emitter-rule', names);
 
 export const executeEmitterRule = async (emitterRule, { run, task, request, state }) => {
     const { spec: { script: content } } = emitterRule;

@@ -1,5 +1,4 @@
 import { generateObjectID } from "es-object-id";
-import { redis } from "../utils/redis.js";
 
 import { getLogger } from 'koa-es-template'
 import { executePrefetcher, getPrefetchers } from "./prefetcher.js";
@@ -7,6 +6,7 @@ import api from "../utils/api.js";
 import { executeEmitter, getEmitter } from "./emitter.js";
 import { exportName, importNamespace } from "../utils/imports.js";
 import { staticClone } from "../utils/objects.js";
+import DataSource from "../plugins/data-source/data-source.js";
 
 const logger = getLogger('run');
 
@@ -215,16 +215,9 @@ export const nextTick = run => {
  * @param run
  * @returns {Promise<*>}
  */
-export const saveRun = run => {
-    logger.info('保存工作流运行信息...')
-    return redis.set(`workflow:${ run.id }`, JSON.stringify(run));
-}
+export const saveRun = run => DataSource.runs.save(run)
 
-export const loadRun = async id => {
-    logger.info('load run', id)
-    const runData = await redis.get(`workflow:${ id }`)
-    return runData ? JSON.parse(runData) : null
-}
+export const loadRun = id => DataSource.runs.load(id)
 
 export const respondRun = async (run, task, request, action, payload) => {
     const state = run.config.spec.states.find(({ name }) => name === task.stateName)
