@@ -3,12 +3,13 @@ export class ConfigsDataSource {
      * 获取配置
      * @param kind
      * @param name
-     * @returns {Promise<any>}
+     * @returns {Promise<{kind:String, name:String, metadata: Object, spec: Object}>}
      */
     getOne;
     /**
      * 保存配置
-     * @param config
+     * @param config {{kind:String, name:String, metadata: Object, spec: Object}}
+     * @param operator {String}
      * @returns {*}
      */
     save
@@ -16,7 +17,7 @@ export class ConfigsDataSource {
      * 获取多个配置
      * @param kind
      * @param names
-     * @returns {Promise<*|*[]>}
+     * @returns {Promise<{kind:String, name:String, metadata: Object, spec: Object}[]>}
      */
     getMultiple
 }

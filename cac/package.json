@@ -1,0 +1,23 @@
+{
+  "name": "es-configuration-as-code",
+  "version": "1.0.0",
+  "description": "Configuration as Code",
+  "main": "src/index.js",
+  "author": "Chun Li",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "node src/index.js"
+  },
+  "dependencies": {
+    "es-fetch-api": "^2.0.2",
+    "es-ioredis-url": "^1.0.13",
+    "es-object-id": "^1.0.0",
+    "koa-es-template": "^1.0.51",
+    "mongodb": "^7.2.0",
+    "yaml": "^3.0.0-0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
