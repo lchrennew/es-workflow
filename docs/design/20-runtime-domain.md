@@ -49,7 +49,6 @@ class WorkflowTask {
   +Map~String,String~ inputParameters
   +Map~String,String~ livingParameters
   +Map~String,String~ outputParameters
-  +String createdAt
   +String updatedAt
 }
 
@@ -63,7 +62,6 @@ class WorkflowRequest {
   +String runId
   +String taskId  %% ObjectID
   +String target
-  +String createdAt
   +WorkflowResponse response
 }
 
@@ -135,6 +133,9 @@ WorkflowTask *-- TaskSource : source
    - 赋值规则：
      - `Ignored`：固定写入 `"ignored"`
      - `Completed`：写入导致该 Task 完成并推进到后续状态的事件名（例如 `"passed"` / `"rejected"` / `"start"`）
+9. **时间字段约定（新增）**：
+   - `task.id` 为 ObjectId，可从中推导创建时间，因此 Task 不单独保存 `createdAt`
+   - 如需记录更新时刻，可保留 `task.updatedAt`（UTC 字符串）
 
 ### Fork/Join（当前取向）
 当前版本优先采用“事件驱动 + 启动条件不通过触发事件/忽略任务”的低复杂度方案，不引入 ForkID 机制。
@@ -172,10 +173,6 @@ stateDiagram
 - `stateName="initial"`：任务创建即 `Completed`，并通过系统调用执行一次 emitterRules 产出事件 `"start"`（默认可用 `system/start/auto-start`）。
 - `stateName="end"`：任务创建即 `Completed`，并驱动 WorkflowRun 进入 `Completed`（结束）。
 
-### 扩展点（待你确认是否需要）
-- `Failed`：处理失败（是否允许重试、是否进入 run.fail，后续定）
-- `Canceled`：被取消（例如运行被取消或人工取消）
-
 ---
 
 ## WorkflowRequest / WorkflowResponse（草案）
@@ -190,7 +187,7 @@ stateDiagram
 - `WorkflowRequest.target`：目标处理方标识，例如：
   - `user:<工号>`
   - `sys:<系统标识>`
-- `WorkflowRequest.createdAt`：创建时间（UTC 字符串，格式 `YYYY-MM-DD HH:mm:ss`）。
+- `WorkflowRequest.id`：ObjectId（可从中推导创建时间，因此不单独保存 `createdAt`）。
 - `WorkflowResponse.action/payload/time`：响应动作、响应数据与响应时间（UTC 字符串，同格式）。
 
 ### 基于参数的发请求方案（已确认）
@@ -200,6 +197,38 @@ stateDiagram
   - 示例：`user:10086,user:10010,sys:risk`
 - 生成规则：Task 进入 `InProgress` 时按该列表生成 `task.requests`
 
+### RequestSender 参与时机（新增）
+> 说明：`WorkflowRequest` 生成后需要“投递到外部系统/通道”，由 RequestSender 负责。
+1. 对每个 `WorkflowRequest.target`（形如 `<senderName>:<ref>`），解析得到 `senderName/ref`
+2. 按 `senderName` 加载 `RequestSender(kind="request-sender", name=senderName)`
+3. 执行 `sender.spec.script` 完成发送，并将发送回执/状态写入 request（字段待你后续确认）
+
+### Webhook 参与时机（运行逻辑扩展点）
+> 说明：
+> - webhook 不作为独立配置领域建模，仅在运行逻辑中定义触发点与 payload 约定
+> - 投递语义：至多一次（发送失败不重试）
+> - `initial/end` 两个系统保留状态的 task 不触发 webhook
+> - `Ignored` 不触发 webhook
+>
+> 概念辨析（重要）：
+> - webhook：面向外部系统集成（外部系统可读）
+> - WorkflowEvent：面向用户审计/回放（人可读）
+> 二者不是一回事；webhook 可在 payload 中携带 `workflowEventId` 以便关联（见 ADR-027）。
+>
+> 事件清单与 payload 约定（按你的最新要求；下表中的 payload 字段为 **HTTP 请求体** 的字段集合）：
+>
+> **Webhook 列表（逐条展开）**
+>
+> | webhook 名称 | 触发时机（何时触发） | payload 字段（该时机完整展开） |
+> |---|---|---|
+> | `run.started` | `startRun` 成功后，run 进入 `Running` | `run`（WorkflowRun，全量） |
+> | `run.completed` | run 到达 `end` 并进入 `Completed` | `run`（WorkflowRun，全量） |
+> | `task.started` | 非 `initial/end` 的 task 进入 `InProgress` | `run`（全量）；`taskId`；`emitter`（上游任务的 emitter 实体对象） |
+> | `task.completed` | 非 `initial/end` 的 task 进入 `Completed`（Ignored 不触发） | `run`（全量）；`taskId`；`event`（导致任务结束的事件）；`emitter`（触发事件的 emitter 实体对象）；`emitterRule`（触发事件的规则实体对象） |
+> | `request.sent` | RequestSender 成功投递某条 request 后 | `run`（全量）；`taskId`；`request`（WorkflowRequest 实体）；`emitter`（当前任务的 emitter 实体对象） |
+> | `response.received` | 外部系统提交 response 后（写入 request.response 成功） | `run`（全量）；`taskId`；`requestId`；`payload`（应答 payload） |
+> | `task.updated` | 非 `initial/end` 的 task 发生更新后（用于可视化刷新；Ignored 不触发） | `run`（全量）；`task`（更新后的 WorkflowTask，全量） |
+
 ---
 
 ## WorkflowRun 状态机（草案）
@@ -208,11 +237,7 @@ stateDiagram
   [*] --> Initialized: create
   Initialized --> Running: start
   Running --> Completed: reach end
-  Running --> Failed: fail
-  Running --> Canceled: cancel
-  Failed --> [*]
   Completed --> [*]
-  Canceled --> [*]
 ```
 
 > 注：Suspended/Retrying 等中间态后续按需要加入。

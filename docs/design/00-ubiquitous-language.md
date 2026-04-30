@@ -113,6 +113,18 @@
   - 每个 request 最多对应一个 response
   - request 可包含第三方标识（例如 `user:<工号>` / `sys:<系统标识>`）用于路由与审计
 
+### RequestSender（请求发送器配置）
+- 含义：独立业务领域中的配置实体，用于把运行期生成的 `WorkflowRequest` 投递到外部系统/通道。
+- 配置结构：`kind/name/metadata/spec`
+- kind（已确认）：`request-sender`
+- 映射规则（强约束）：request target 表达式为 `<senderName>:<ref>`，其中 `senderName` 必须等于 `RequestSender.name`
+- spec：仅包含 `script`（运行时默认按 JavaScript 执行；script 仅填写 content，运行时按统一函数签名包装；详见 `17-request-sender-domain.md`）
+
+### Webhook（运行期通知机制）
+- 含义：引擎在运行期关键时机向外部系统投递通知的机制；不作为独立配置领域建模，仅作为运行逻辑的扩展点描述。
+- 语义：至多一次（不重试）
+- 触发点：见运行域 `20-runtime-domain.md` 中的 “Webhook 参与时机”
+
 ### WorkflowEmitter（事件触发器）
 - 含义：由配置域指定的触发策略，用于在收到 response 时决定“是否触发事件推进工作流运行”。
 - 配置位置：
@@ -161,5 +173,18 @@
 - 用法：第三方/编排 UI 可据此展示该 state “可能推进到的事件出口”；引擎可用其对 `EmitterRule` 产出的 `event.name` 做校验（策略由实现决定）。
 
 ### WorkflowEvent（运行期事件）
-- 含义：运行期用于推进 WorkflowRun 状态机的事件记录，通常由 emitter 或引擎内部逻辑产生。
-- 字段：`id(ObjectId)`、`runId`、`taskId(ObjectId)`、`name`、`source`、`payload(字符串字典)`
+- 含义：运行期“发生了什么”的事件记录，用于给用户查看 WorkflowRun 的经历（**人可读审计时间线**），同时也是状态机推进的依据。
+- 关注：可读性、解释性、可追溯（例如谁触发、触发原因、展示名称/颜色/图标等）。
+- 字段（建议）：
+  - `id(ObjectId)`、`runId`、`taskId(ObjectId)`、`name`
+  - `title/color/icon`（可选，用于 UI 展示）
+  - `source`（触发来源，例如 engine/emitter/emitterRule/request）
+  - `payload`（字符串字典，存放可解释的上下文摘要）
+
+### Webhook（外部系统通知）
+- 含义：当特定运行期时机或内部事件发生时，引擎向外部系统发送通知（**外部系统可读**，用于集成）。
+- 语义：至多一次（发送失败不重试；失败不影响 WorkflowEvent 记录）。
+- 内容原则：
+  - 对外提供稳定、机器可处理的信息（建议包含 `eventName/runId` 等）
+  - 可选包含 `workflowEventId` 作为关联（便于外部系统定位对应的人类可读事件）
+  - 避免把内部实现细节（例如脚本内容）作为对外契约
