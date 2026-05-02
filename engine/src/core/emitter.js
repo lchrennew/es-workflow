@@ -29,7 +29,7 @@ export const getEmitterRules = async names => DataSource.configs.getMultiple('em
 export const executeEmitterRule = async (emitterRule, { run, task, request }) => {
     const { spec: { script: content } } = emitterRule;
     const script =
-        `async (run, task, request, state, api) => {
+        `async (run, task, request, api) => {
             const event = { name: null };
             ${ content }
             return event;
