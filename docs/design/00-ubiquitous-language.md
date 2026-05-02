@@ -110,8 +110,9 @@
 - 含义：当 Task 进入 `InProgress` 后，对外部处理方发起的请求（request），以及对应的单次响应（response）。
 - 特征：
   - 一个 Task 可以产生多个 request
-  - 每个 request 最多对应一个 response
+  - 每个 request 可以对应多个 response（response 作为日志）；其中最多有 1 个“决策类 action”的 response，且必须排在最后
   - request 可包含第三方标识（例如 `user:<工号>` / `sys:<系统标识>`）用于路由与审计
+  - 撤回响应（留痕）：不置空 response；将原 request 标记为作废（voided），并创建新的 request 重新发起（见运行域）
 
 ### RequestSender（请求发送器配置）
 - 含义：独立业务领域中的配置实体，用于把运行期生成的 `WorkflowRequest` 投递到外部系统/通道。
@@ -128,7 +129,7 @@
 ### WorkflowEmitter（事件触发器）
 - 含义：由配置域指定的触发策略，用于在收到 response 时决定“是否触发事件推进工作流运行”。
 - 配置位置：
-  - `WorkflowState.emitter`：定义对外可执行操作清单（allowedActions）
+  - `WorkflowState.emitter`：定义对外可执行操作清单（actions，含 kind）
   - `WorkflowState.emitterRules`：定义规则链（按顺序执行，短路）
 - 当前约定：
   - 每次收到一个 response，会触发一次 emitter 执行
@@ -136,11 +137,21 @@
   - 若产出事件，则事件名取 emitter 输出（不要求等于 `response.action`）
 
 ### WorkflowStateEmitter（状态事件触发器配置）
-- 含义：独立业务领域中的配置实体，用于声明某个业务场景下的“可执行操作清单”（allowedActions）。
+- 含义：独立业务领域中的配置实体，用于声明某个业务场景下的“可执行操作清单”（actions，含 kind）。
 - 配置结构：`kind/name/metadata/spec`
 - kind（已确认）：`workflow-transition-emitter`
 - 引用方式：Workflow 配置中的 `WorkflowState.emitter` 引用 `WorkflowStateEmitter.name`
  - metadata.forUserState：是否允许被用户新增 state 选择（用于 UI 过滤与治理）
+
+### AllowedAction.kind（操作类别）
+- 含义：配置在 `WorkflowStateEmitter.spec.actions[*].kind` 上，用于声明该 action 属于“决策类”还是“更新任务类”。
+- 枚举：
+  - `decision`：决策类 action（参与 emitterRules 的统计与事件触发）
+  - `update-task`：更新任务类 action（不参与事件触发；其 response.payload 仅允许固定结构的新增/作废请求指令）
+- 语义补充：
+  - 更新任务类 action 会触发 `task.updated` webhook
+  - 作废 request：保留 request 不删除，仅标记为 voided（留痕）；可不产生后续新 request
+  - 撤回 response（留痕约定）：不将 response 置空；将原 request 标记为作废（voided），并创建新的 request 重新发起（见运行域）
 
 ### EmitterRule（状态触发规则配置）
 - 含义：独立业务领域中的配置实体，一条规则一个脚本，用于在收到 response 时判定是否产出内部事件名。
@@ -158,9 +169,9 @@
   - `script`：运行时默认按 JavaScript 执行；script 仅填写 content，运行时按统一函数签名包装
 - 引用方式：Workflow 配置中的 `WorkflowTransitionTarget.prefetchers[*]` 引用 `Prefetcher.name`
 
-### Emitter.allowedActions（对外可执行操作清单）
-- 含义：配置在 `WorkflowStateEmitter.spec.allowedActions` 上，用于声明第三方在该任务上“允许提交哪些 `response.action`”，并提供显示名称。
-- 结构：每项包含 `action`（操作标识）与 `title`（显示名称）。
+### Emitter.actions（对外可执行操作清单）
+- 含义：配置在 `WorkflowStateEmitter.spec.actions` 上，用于声明第三方在该任务上“允许提交哪些 `response.action`”，并为每个 action 提供显示名称与类别（kind）。
+- 结构：每项包含 `action`（操作标识）、`title`（显示名称）、`kind`（`decision`/`update-task`）。
 - 用法：第三方通过 `runId + taskId` 获取任务当前 state 的 emitter 配置，读取该字段作为按钮/操作清单；提交的 `response.action` 应在该集合的 `action` 集合内（校验策略由实现决定）。
 
 ### Emitter.allowedEvents（对外可见内部事件清单）

@@ -41,6 +41,7 @@ class WorkflowStateEmitterMetadata {
 class AllowedAction {
   +String action
   +String title
+  +String kind  %% decision | update-task
 }
 
 class AllowedEvent {
@@ -51,12 +52,12 @@ class AllowedEvent {
 }
 
 class EmitterSpec {
-  +List~AllowedAction~ allowedActions
+  +List~AllowedAction~ actions
   +List~AllowedEvent~ allowedEvents
 }
 
 MetadataBase <|-- WorkflowStateEmitterMetadata
-EmitterSpec *-- AllowedAction : allowedActions
+EmitterSpec *-- AllowedAction : actions
 EmitterSpec *-- AllowedEvent : allowedEvents
 ```
 
@@ -82,12 +83,20 @@ EmitterSpec *-- AllowedEvent : allowedEvents
 ### spec
 Emitter 的职责是“定义可执行操作清单”，触发判定通过独立的 `EmitterRule` 完成（见 `16-emitter-rule-domain.md`）。
 
-`allowedActions`（可选，建议配置）
-- 含义：对外暴露的“可执行操作”集合（即第三方可提交的 `response.action`），并为每个操作提供显示名称
+`actions`（可选，建议配置）
+- 含义：对外暴露的“可执行操作”集合（即第三方可提交的 `response.action`），并为每个操作提供显示名称与类别，用于 UI 渲染与运行期分流。
 - 结构：
   - `action`：操作标识（将写入 `response.action`）
   - `title`：显示名称（用于 UI 展示）
-- 第三方可通过 `runId + taskId` 获取当前任务对应 state 的 emitter，读取该字段作为可执行操作清单
+  - `kind`：操作类别（枚举）：
+    - `decision`：决策类操作（参与 emitterRules 统计与事件触发）
+    - `update-task`：更新任务类操作（不参与事件触发；仅允许固定 payload 结构，见运行域）
+- 约束建议：
+  - `actions[*].action` 在同一 emitter 内唯一（避免 action 名冲突）
+  - 对同一条 request，最多只能出现一条 `kind=decision` 的 response，且必须排在最后（见运行域）
+- 运行期语义（概览）：
+  - `kind=decision`：执行 `state.emitterRules`，产出内部事件并迁移
+  - `kind=update-task`：不产出内部事件、不迁移；引擎直接读取 `response.payload` 的更新意图更新当前 Task（仅允许“新增请求/作废请求”，数据结构固定；见 `20-runtime-domain.md`），并触发 `task.updated` webhook
 
 `allowedEvents`（可选，建议配置）
 - 含义：声明该 emitter 在其规则链（`EmitterRule`）执行后**可能产出的内部事件集合**，并为每个事件提供显示名称（用于 UI 展示/编排校验）。
@@ -106,7 +115,7 @@ Emitter 的职责是“定义可执行操作清单”，触发判定通过独立
 ## 与 Workflow 配置的关联（引用关系）
 
 在 Workflow 的配置域中：
-- `WorkflowState.emitter` 作为**引用标识**，指向某个 `WorkflowStateEmitter.name`（用于声明 allowedActions）
+- `WorkflowState.emitter` 作为**引用标识**，指向某个 `WorkflowStateEmitter.name`（用于声明 actions）
 - `WorkflowState.emitterRules[*]` 作为**规则 key 列表（有序）**；引擎拼接得到 `EmitterRule.name`：`<state.emitter>/<ruleKey>`（用于判定触发内部事件）
 
 ---
@@ -115,7 +124,7 @@ Emitter 的职责是“定义可执行操作清单”，触发判定通过独立
 
 > 说明：
 > - 下方 `spec.script` 均为 **content**（函数体内容），运行时会按本文档的统一函数签名包装。
-> - 示例里假设 `task.requests` 中的每个 request 可能携带 `response`，可用于统计已收到的响应。
+> - 示例里假设 `task.requests` 中的每个 request 可能携带 `responses`（日志），规则仅统计 `kind=decision` 的响应（见 `16-emitter-rule-domain.md`）。
 
 ```yaml
 kind: workflow-transition-emitter
@@ -124,11 +133,13 @@ metadata:
   title: 审批场景 emitter
   forUserState: true
 spec:
-  allowedActions:
+  actions:
     - action: ACCEPT
       title: 通过
+      kind: decision
     - action: REFUSE
       title: 拒绝
+      kind: decision
   allowedEvents:
     - name: passed
       title: 通过
@@ -154,7 +165,7 @@ metadata:
   title: 开始节点 emitter
   forUserState: false
 spec:
-  allowedActions: []
+  actions: []
   allowedEvents:
     - name: start
       title: 启动

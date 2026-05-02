@@ -127,13 +127,20 @@ WorkflowTransition *-- WorkflowTransitionTarget : targets
 - `states`：状态集合（状态名唯一性、是否允许复用/别名，待你后续确认）
   - `state.conditions`：启动条件脚本（可选），用于运行期“任务门控”（见下方两段式语义）
   - `state.emitter`：状态级 emitter 标识（可选）  
-    - 语义：定义该 state 对外暴露的可执行操作集合（allowedActions），并作为该 state 的“业务场景 emitter”标识
+    - 语义：定义该 state 对外暴露的可执行操作集合（`actions`，含 `kind`），并作为该 state 的“业务场景 emitter”标识
     - 引用：指向独立配置域 `WorkflowStateEmitter.name`（见 `15-emitter-domain.md`）
   - `state.emitterRules`：状态级 emitter-rule 引用列表（可选，**有序**）  
     - 语义：
       - 常规 state：当该 state 的 Task 收到 response 时，引擎按顺序依次执行这些规则；第一条返回内部事件名的规则生效并短路
       - `initial`：在创建 `initial` 的 Task 后，引擎可作为系统调用执行一次规则链（例如 `auto-start`）以产出 `start` 事件
     - 命名约定：每个元素为 **ruleKey**（不含前缀）；引擎拼接得到 `EmitterRule.name`：`<state.emitter>/<ruleKey>`（以 `/` 分隔，见 `16-emitter-rule-domain.md`）
+  - update-task actions（更新任务类操作）
+    - 触发方式：当该 state 的 Task 收到 response，且 `response.action` 在 emitter 的 `spec.actions` 中被声明为 `kind="update-task"` 时
+    - 语义：该类 response **不用于推进状态机**；引擎直接读取 `response.payload` 进行 Task 更新（不产出内部事件、不触发迁移）
+    - 可更新内容（当前已确认）：
+      - 增加 request
+      - 作废 request（用于“删除请求”的留痕表达：无后续新 request）
+      - 撤回 response：将已具备 response 的 request 标记为作废（void），并发起新的替代 request（留痕）
   - `state.transitions`：该状态的**外发迁移**集合（邻接表表达）
     - `event`：触发事件名
     - `targets`：目标状态列表（允许多个）

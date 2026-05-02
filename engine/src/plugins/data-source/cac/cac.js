@@ -1,3 +1,3 @@
-import { Client } from 'es-configuration-as-code-client'
+import { Client } from 'cac-client'
 
-export const cacClient = new Client(process.env.CAC_URL)
+export const cacClient = new Client(process.env.CAC_API)

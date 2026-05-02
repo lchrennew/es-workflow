@@ -71,7 +71,11 @@ MetadataBase <|-- EmitterRuleMetadata
     return event;
   }
   ```
-- **建议**：规则判定逻辑尽量只依赖 `task.requests`（已累积的全量 request/response 视图），避免依赖“本次触发的 request”，从而保证多规则组合时的可预期性与幂等性。
+- **建议**：规则判定逻辑尽量只依赖 `task.requests`（已累积的全量 request/responses 视图），避免依赖“本次触发的 request”，从而保证多规则组合时的可预期性与幂等性。
+- response 过滤约定（新增）：
+  - `WorkflowRequest.responses` 为日志，包含 `kind=decision/update-task`
+  - 规则脚本应仅统计 `kind="decision"` 的 response（update-task 仅用于更新任务，不应影响事件判定）
+  - 对 `status="voided"` 的 request，规则脚本通常应忽略（被作废的 request 不再参与统计）
 - 返回值约定（已确认：仅 eventName）：
   - 返回对象 `event`，其中：
     - `event.name === null`：本规则不触发事件（继续执行下一条规则）
@@ -90,8 +94,12 @@ metadata:
 spec:
   script: |
     // 任意人拒绝即拒绝（使用 task.requests 视图，避免依赖本次 request）
-    const responses = (task.requests ?? []).map(r => r?.response).filter(Boolean);
-    if (responses.some(r => r.action === "REFUSE")) event.name = "rejected";
+    const decisionActions = (task.requests ?? [])
+      .filter(r => r?.status !== "voided")
+      .map(r => (r?.responses ?? []).filter(x => x?.kind === "decision").at(-1)?.action)
+      .filter(Boolean);
+
+    if (decisionActions.some(a => a === "REFUSE")) event.name = "rejected";
 ```
 
 ### 规则2：有 1 人通过即通过（任意 ACCEPT -> passed）
@@ -103,8 +111,12 @@ metadata:
 spec:
   script: |
     // 任意人通过即通过
-    const responses = (task.requests ?? []).map(r => r?.response).filter(Boolean);
-    if (responses.some(r => r.action === "ACCEPT")) event.name = "passed";
+    const decisionActions = (task.requests ?? [])
+      .filter(r => r?.status !== "voided")
+      .map(r => (r?.responses ?? []).filter(x => x?.kind === "decision").at(-1)?.action)
+      .filter(Boolean);
+
+    if (decisionActions.some(a => a === "ACCEPT")) event.name = "passed";
 ```
 
 ### 规则3：两人通过即通过（累计 >=2 个 ACCEPT -> passed）
@@ -116,7 +128,8 @@ metadata:
 spec:
   script: |
     const actions = (task.requests ?? [])
-      .map(r => r?.response?.action)
+      .filter(r => r?.status !== "voided")
+      .map(r => (r?.responses ?? []).filter(x => x?.kind === "decision").at(-1)?.action)
       .filter(Boolean);
 
     const acceptCount = actions.filter(a => a === "ACCEPT").length;
@@ -148,12 +161,14 @@ metadata:
   title: 收齐后多数通过
 spec:
   script: |
-    const requests = task.requests ?? [];
-    const responses = requests.map(r => r?.response).filter(Boolean);
-    if (responses.length < requests.length) return event;
+    const requests = (task.requests ?? []).filter(r => r?.status !== "voided");
+    const decisions = requests
+      .map(r => (r?.responses ?? []).filter(x => x?.kind === "decision").at(-1))
+      .filter(Boolean);
+    if (decisions.length < requests.length) return event;
 
-    const acceptCount = responses.filter(r => r.action === "ACCEPT").length;
-    const refuseCount = responses.filter(r => r.action === "REFUSE").length;
+    const acceptCount = decisions.filter(r => r.action === "ACCEPT").length;
+    const refuseCount = decisions.filter(r => r.action === "REFUSE").length;
 
     event.name = (acceptCount > refuseCount) ? "passed" : "rejected";
 ```
@@ -173,8 +188,11 @@ spec:
     const now = await api.nowUtc(); // 示例：实现注入
     if (now <= deadline) return event;
 
-    const responses = (task.requests ?? []).map(r => r?.response).filter(Boolean);
-    if (responses.some(r => r.action === "REFUSE")) return event;
+    const decisionActions = (task.requests ?? [])
+      .filter(r => r?.status !== "voided")
+      .map(r => (r?.responses ?? []).filter(x => x?.kind === "decision").at(-1)?.action)
+      .filter(Boolean);
+    if (decisionActions.some(a => a === "REFUSE")) return event;
 
     event.name = "passed";
 ```
@@ -189,10 +207,12 @@ metadata:
 spec:
   script: |
     // 仅指定处理方有效：只看 target=user:10086 的响应（不依赖本次触发的 request）
-    const req = (task.requests ?? []).find(r => r?.target === "user:10086" && r?.response);
+    const req = (task.requests ?? []).find(r => r?.target === "user:10086" && (r?.responses ?? []).length > 0);
     if (!req) return event;
-    if (req.response?.action === "ACCEPT") event.name = "passed";
-    if (req.response?.action === "REFUSE") event.name = "rejected";
+    const decision = (req.responses ?? []).filter(x => x?.kind === "decision").at(-1);
+    if (!decision) return event;
+    if (decision.action === "ACCEPT") event.name = "passed";
+    if (decision.action === "REFUSE") event.name = "rejected";
 ```
 
 ### 规则7：幂等防抖（若已触发过 PASSED/REJECTED，则忽略后续 response）

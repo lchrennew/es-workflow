@@ -62,12 +62,22 @@ class WorkflowRequest {
   +String runId
   +String taskId  %% ObjectID
   +String target
-  +WorkflowResponse response
+  +WorkflowRequestVoidInfo voidInfo
+  +List~WorkflowResponse~ responses
+}
+
+class WorkflowRequestVoidInfo {
+  +String voidedAt
+  +String reason
+  +String by
+  +String newRequestId  %% ObjectID (nullable)
 }
 
 class WorkflowResponse {
+  +String id  %% ObjectID
   +String action
-  +Map~String,String~ payload
+  +String kind  %% decision | update-task
+  +Map~String,Object~ payload
   +String time
 }
 
@@ -82,7 +92,7 @@ class WorkflowEvent {
 
 WorkflowRun *-- WorkflowTask : tasks
 WorkflowTask *-- WorkflowRequest : requests
-WorkflowRequest *-- WorkflowResponse : response
+WorkflowRequest *-- WorkflowResponse : responses
 WorkflowRun *-- WorkflowEvent : events
 WorkflowTask *-- TaskSource : source
 ```
@@ -179,7 +189,42 @@ stateDiagram
 
 ### 语义（已对齐）
 1. 当 Task 进入 `InProgress` 后，可以发出若干 `request`（对外部处理事件的请求）。
-2. 每个 `request` 最多对应一个 `response`。
+2. 每个 `request` 可以对应多个 `response`（response 作为日志）。
+3. **决策类 response 约束（新增，已确认）**：
+   - 每个 request 的 responses 中，最多只能有 1 个“决策类 action”的 response
+   - 且该决策类 response 必须排在最后（即一旦出现决策类 response，该 request 后续不再接受任何 response）
+4. `WorkflowResponse.kind`（新增）：由引擎在写入 response 时根据 emitter 的 `actions[action].kind` 派生并固化，便于规则脚本做过滤与统计（忽略 update-task 日志）。
+
+### 更新任务类响应（新增）
+> 说明：部分 `response.action` 不用于推进状态机，而用于更新当前 Task（例如加签：新增请求；作废请求；撤回响应并重新发起）。
+> 该类 action 在 emitter 配置中通过 `WorkflowStateEmitter.spec.actions[*].kind="update-task"` 显式声明（见 `15-emitter-domain.md`）。
+>
+> 当收到 response 且命中 update-task action：
+> 1) 引擎将该 response 视为“更新指令”，不产出内部事件、不触发迁移
+> 2) 引擎从 `response.payload` 读取更新意图，并应用到当前 task
+> 3) 允许的更新（当前已确认）：
+>    - 增加 request
+>    - 作废 request（无后续新 request；用于“删除请求”的留痕表达）
+>    - 撤回 response：**不做置空**，而是将已具备决策类 response 的 request 标记为 `voided`（保留原 responses 留痕），并创建新的 request 重新发起
+> 4) 应触发 `task.updated` webhook；若新增 request 且成功发送，触发 `request.sent`；`response.received` 仍在“收到 response”时触发（见下方 webhook 表）
+>
+> #### response.payload（update-task action 的约定字段）
+> > 说明：`WorkflowResponse.payload` 类型为 `Map<String,Object>`，可直接承载列表/对象；字段结构固定。
+> - `addRequests`（可选）：要新增的 request 列表（数组，元素为 target 字符串）
+> - `voidRequests`（可选）：要作废的 request 列表（数组，元素结构：`{requestId, reason}`）
+>   - `requestId`：要作废的 requestId
+>   - `reason`：作废原因（字符串）
+>
+> #### 撤回响应（留痕）字段回写（已确认）
+> 当对某条 request 执行撤回响应：
+> - 原 request：
+>   - 标记为作废：写入 `voidInfo`
+>   - `voidInfo.voidedAt`：作废时间（UTC 字符串）
+>   - `voidInfo.reason`：作废原因（建议来自 response.payload 的摘要或 action 名）
+>   - `voidInfo.by`：作废操作者标识（来源于 response 的 source/操作者上下文，由实现提供）
+>   - `voidInfo.newRequestId`：新创建 request 的 id（用于追溯；无替代时可为空）
+>   - 保留原 `responses` 不变（留痕）
+> - 新 request：创建新 ObjectId，并按正常流程发送
 
 ### 字段说明（草案）
 - `WorkflowRequest.runId`：关联的运行标识（来自 `WorkflowRun.id`）。
@@ -188,6 +233,12 @@ stateDiagram
   - `user:<工号>`
   - `sys:<系统标识>`
 - `WorkflowRequest.id`：ObjectId（可从中推导创建时间，因此不单独保存 `createdAt`）。
+- `WorkflowRequest.voidInfo`：作废信息值对象；存在即表示该 request 已作废（voided）
+  - `voidedAt`：作废时间（UTC 字符串）
+  - `reason`：作废原因
+  - `by`：作废操作者标识
+  - `newRequestId`：后续新 requestId（可空；删除请求/纯作废时为空）
+- `WorkflowResponse.id`：ObjectId（用于幂等与追溯；可从中推导创建时间）
 - `WorkflowResponse.action/payload/time`：响应动作、响应数据与响应时间（UTC 字符串，同格式）。
 
 ### 基于参数的发请求方案（已确认）
@@ -397,7 +448,7 @@ stateDiagram
   RequestSent --> WaitResponse: 等待response
   WaitResponse --> ResponseArrived: 收到response(action,payload,time)
 
-  ResponseArrived --> Emit: emit(stateEmitterRules, task, request)\n每次response触发一次emit
+  ResponseArrived --> Emit: emit(stateEmitterRules, task, request)\n仅 decision response 触发 emit
   Emit --> EventProduced: 产出事件\neventName=event.name\n创建WorkflowEvent
   Emit --> NoEvent: 不产出事件
 
@@ -426,9 +477,9 @@ stateDiagram
 > 作用：当 Task 处于 `InProgress` 且某个 request 收到 `response` 时，决定“是否触发事件推进 WorkflowRun”。  
 > 本模型中 emitter **归属配置域**：`WorkflowState.emitter` 用于定义可执行操作清单；触发判定由 `WorkflowState.emitterRules`（规则链）完成。  
 > 你已确认：
-> 1. **每次收到 response 都会触发一次 emit**（一次 response -> 一次 emitter 执行）
+> 1. **每次收到 decision response 都会触发一次 emit**（一次 decision response -> 一次 emitter 执行；update-task response 走独立更新管线）
 > 2. emit 的输入至少包含：`task` 与 `request`（可读取 task/run 参数与已累积的请求响应情况）
 > 3. emit 的输出：要么产生一个事件（推进状态机），要么什么也不产生（例如“所有人都通过才进入下一状态”的聚合判断未满足时不触发）
 > 4. 若产生事件，则 **eventName 取 emitter 输出**（可能与 `response.action` 不同，例如 `accept/refuse` 聚合后输出 `passed`）
-> 5. 对外可执行操作清单来自 `WorkflowStateEmitter.spec.allowedActions`（含显示名称）；`response.action` 是否必须属于该集合由实现决定（建议校验）
+> 5. 对外可执行操作清单来自 `WorkflowStateEmitter.spec.actions`（含显示名称与 kind）；`response.action` 是否必须属于该集合由实现决定（建议校验）
 > 6. emitter 可选声明 `WorkflowStateEmitter.spec.allowedEvents`（含显示名称）作为“可能产出的内部事件清单”，用于 UI 展示与对规则链产出 `event.name` 的校验（建议校验）

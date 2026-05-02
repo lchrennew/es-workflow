@@ -7,6 +7,8 @@ import { executeEmitter, getEmitter } from "./emitter.js";
 import { exportName, importNamespace } from "../utils/imports.js";
 import { staticClone } from "../utils/objects.js";
 import DataSource from "../plugins/data-source/data-source.js";
+import webhooks from "./webhooks.js";
+import dayjs from "dayjs";
 
 const logger = getLogger('run');
 
@@ -20,11 +22,13 @@ const strategies = {
         const task = await createTask(run, 'initial')
 
         await saveRun(run)
+        await webhooks.runStarted({ run })
         logger.info('运行状态机...运行已保存');
 
-        const state = run.config.spec.states.find(({ name }) => name === task.stateName);
-        await executeEmitter(state, { run, task })
+        await executeEmitter({ run, task })
         logger.info('运行状态机...已启动初始任务');
+
+
     },
 
     running: async run => {
@@ -44,6 +48,7 @@ const strategies = {
             pushEvent(run, { type: 'run', message: `工作流结束` });
             await saveRun(run)
             logger.info('运行状态机...运行已保存');
+            await webhooks.runCompleted({ run })
         } else if (end) {
             logger.info('运行状态机...不满足结束条件，忽略');
             return ignoreTask(run, end)
@@ -56,6 +61,10 @@ const createTask = async (run, stateName, inputParameters = {}, source) => {
     const state = run.config.spec.states.find(({ name }) => name === stateName);
     const task = {
         id: generateObjectID(),
+        name: stateName,
+        emitter: state.emitter,
+        emitterRules: state.emitterRules,
+        transitions: state.transitions,
         stateName,
         title: state.title,
         status: 'initial',
@@ -99,7 +108,7 @@ const ignoreTask = async (run, task) => {
         logger.info('创建目标任务...不满足启动条件-结束创建过程', run.id, task.id)
     }
 }
-const createNextTask = async (run, target, inputParameters, source) => {
+const createNextTask = async (run, target, inputParameters, source, emitter, emitterRule) => {
     logger.info('创建目标任务', run.id, target.state)
     const nextState = run.config.spec.states.find(({ name }) => name === target.state)
     logger.info('创建目标任务...已定位目标状态节点', run.id, target.state)
@@ -122,8 +131,10 @@ const createNextTask = async (run, target, inputParameters, source) => {
     logger.info('创建目标任务...任务状态运行中', run.id, task.id)
     task.status = 'in-progress'
 
-    if (task.stateName !== 'end')
+    if (task.stateName !== 'end') {
         pushEvent(run, { type: 'task', message: `新增待办任务：${ task.title }` })
+        await webhooks.taskStarted({ run, taskId: task.id, emitter, emitterRule })
+    }
 
     await createRequests(run, task);
 
@@ -146,19 +157,36 @@ const sendRequest = async (run, task, target) => {
         target,
     }
     task.requests.push(request)
+    await webhooks.requestSent({ run, request })
     pushEvent(run, { type: 'request', message: `待办任务${ task.title }已分配给${ target }` })
     // TODO: 向外部系发送
+
+    return request
 }
 
-export const emitRunEvent = async (run, task, name) => {
+const voidRequest = async (run, task, requestId, action, reason, operator, addedRequests) => {
+    logger.info('作废任务请求', run.id, task.id, requestId, action, reason)
+    const request = task.requests.find(request => request.id === requestId)
+    request.voidInfo = {
+        voidedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+        by: operator,
+        reason,
+        newRequestId: addedRequests[request.target]
+    }
+
+}
+
+export const emitRunEvent = async (run, task, name, emitter, emitterRule) => {
     logger.info('触发事件...', name, run.id, task.id)
     task.endEvent = name
     task.status = 'completed'
     logger.info('触发事件...任务完成', name, run.id, task.id)
     dumpOutputParameters(task)
     logger.info('触发事件...输出参数就位', name, run.id, task.id)
-    if (task.stateName !== 'initial')
+    if (task.stateName !== 'initial') {
         task.endEventId = pushEvent(run, { type: 'task', message: `待办任务${ task.title }已完成：${ name }` })
+        await webhooks.taskCompleted({ run, task, event: name, emitter, emitterRule })
+    }
 
     logger.info('触发事件...保存运行信息', name, run.id, task.id)
     await saveRun(run)
@@ -185,7 +213,7 @@ export const emitRunEvent = async (run, task, name) => {
                 await executePrefetcher(prefetcher, { run, task, target, parameters, api }))
         }
         logger.info('触发事件...启动目标任务', name, run.id, task.id)
-        await createNextTask(run, target, parameters, { parent: task.id, name })
+        await createNextTask(run, target, parameters, { parent: task.id, name }, emitter, emitterRule)
     }
     logger.info('触发事件...完成链路跳转', name, run.id, task.id)
 
@@ -219,15 +247,34 @@ export const saveRun = run => DataSource.runs.save(run)
 
 export const loadRun = id => DataSource.runs.load(id)
 
-export const respondRun = async (run, task, request, action, payload) => {
+const responds = {
+    'decision': (operator, run, task, request,) =>
+        executeEmitter({ run, task, request }),
+    'update-task': async (operator, run, task, request, action, payload,) => {
+        const { addRequests = [], voidRequests = [] } = payload
+        const addedRequests = {}
+        for (const { target } of addRequests) {
+            const addedRequest = await sendRequest(run, task, target)
+            addRequests[target] = addedRequest.id
+        }
+
+        for (const { requestId, reason } of voidRequests) {
+            await voidRequest(run, task, requestId, action, reason, operator, addedRequests)
+        }
+
+        await saveRun(run)
+    }
+}
+
+export const respondRun = async (run, task, request, action, payload, operator) => {
     const state = run.config.spec.states.find(({ name }) => name === task.stateName)
     const emitter = await getEmitter(state.emitter)
-    const { title: actionTitle } = emitter.spec.allowedActions.find(item => item.action === action)
+    const { title: actionTitle, kind } = emitter.spec.actions.find(item => item.action === action)
 
-    request.response = { action, payload }
-    pushEvent(run, { type: 'request', message: `${ request.target }${ actionTitle }了待办事项 ${ task.title }` })
-
-    await executeEmitter(state, { run, task, request })
+    request.responses ??= []
+    request.responses.push({ action, payload, kind })
+    pushEvent(run, { type: 'request', message: `${ operator }${ actionTitle }了待办事项 ${ task.title }` })
+    responds[kind](operator, run, task, request, action, payload,)
 }
 
 export const pushEvent = (run, event) => {

@@ -1,7 +1,6 @@
 import { Controller } from "koa-es-template";
 import { loadRun, nextTick, pushEvent, respondRun, saveRun } from "../core/run.js";
 import { generateObjectID } from "es-object-id";
-import { getEmitter } from "../core/emitter.js";
 
 export default class RunController extends Controller {
 
@@ -40,7 +39,7 @@ export default class RunController extends Controller {
         pushEvent(run, { type: 'run', message: '已初始化' })
         await saveRun(run)
         this.logger.info('启动工作流...开始自动执行');
-        await nextTick(run)
+        nextTick(run)
         this.logger.info('启动工作流...成功启动');
 
         ctx.body = { ok: true }
@@ -56,7 +55,6 @@ export default class RunController extends Controller {
         const request = task.requests.find(request => request.id === requestId)
 
         if (!request) return ctx.body = { ok: false, message: '无可应答请求' }
-        if (request.response) return ctx.body = { ok: false, message: '请求不可重复应答' }
 
         await respondRun(run, task, request, action, payload)
 

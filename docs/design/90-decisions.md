@@ -12,7 +12,7 @@
 - [ADR-008：初始状态采用保留名 \"initial\"](./decisions/ADR-008.md)
 - [ADR-009：结束状态采用保留名 \"end\"](./decisions/ADR-009.md)
 - [ADR-010：在配置域引入 state.emitter + state.emitterRules（规则链）以聚合 response 并触发内部事件](./decisions/ADR-010.md)
-- [ADR-011：Emitter 作为独立配置领域（kind/name/metadata/spec + allowedActions）](./decisions/ADR-011.md)
+- [ADR-011：Emitter 作为独立配置领域（kind/name/metadata/spec + actions）](./decisions/ADR-011.md)
 - [ADR-012：引入 MetadataBase 作为元数据基类](./decisions/ADR-012.md)
 - [ADR-013：移除 TransitionTarget.conditions，仅保留 State.conditions（脚本）](./decisions/ADR-013.md)
 - [ADR-014：开始/结束状态的强制迁移约束](./decisions/ADR-014.md)
@@ -29,6 +29,8 @@
 - [ADR-025：引入 RequestSender 配置域（request target 前缀映射 name）](./decisions/ADR-025.md)
 - [ADR-027：区分 WorkflowEvent（人可读审计）与 Webhook（外部系统通知）](./decisions/ADR-027.md)
 - [ADR-028：运行期对象使用 ObjectId 时不再保存 createdAt/occurredAt（时间从 ObjectId 推导）](./decisions/ADR-028.md)
+- [ADR-029：Emitter actions 增加 kind（decision/update-task），并通过 update-task response.payload 支持增删/作废请求](./decisions/ADR-029.md)
+- [ADR-030：移除 WorkflowRequest.status（以 voidInfo + responses 推导状态）](./decisions/ADR-030.md)
 
 ## 历史（已废弃，仅保留用于追溯）
 

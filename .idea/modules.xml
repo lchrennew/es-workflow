@@ -6,6 +6,7 @@
       <module fileurl="file://$PROJECT_DIR$/editor/editor.iml" filepath="$PROJECT_DIR$/editor/editor.iml" />
       <module fileurl="file://$PROJECT_DIR$/engine/engine.iml" filepath="$PROJECT_DIR$/engine/engine.iml" />
       <module fileurl="file://$PROJECT_DIR$/es-workflow.iml" filepath="$PROJECT_DIR$/es-workflow.iml" />
+      <module fileurl="file://$PROJECT_DIR$/triggers/triggers.iml" filepath="$PROJECT_DIR$/triggers/triggers.iml" />
     </modules>
   </component>
 </project>

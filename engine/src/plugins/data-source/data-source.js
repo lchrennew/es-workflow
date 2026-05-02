@@ -7,8 +7,11 @@ export default class DataSource {
 
     static async init() {
         logger.info('initializing data source...')
-        this.#configs = new ((await import(`./${ process.env.CONFIGS_DATASOURCE ?? 'redis' }/configs.js`)).default)()
-        this.#runs = new ((await import(`./${ process.env.RUNS_DATASOURCE ?? 'redis' }/runs.js`)).default)()
+        const configsDataSource = process.env.CONFIGS_DATASOURCE ?? 'redis';
+        this.#configs = new ((await import(`./${ configsDataSource }/configs.js`)).default)()
+        const runsDataSource = process.env.RUNS_DATASOURCE ?? 'redis';
+        this.#runs = new ((await import(`./${ runsDataSource }/runs.js`)).default)()
+        logger.info({ configsDataSource, runsDataSource })
         logger.info('initialized data source...')
     }
 
