@@ -16,7 +16,7 @@ const strategies = {
     initialized: async run => {
         logger.info('运行状态机...运行状态进行中');
         run.status = 'running'
-        pushEvent(run, { type: 'run', message: `工作流开始运行` });
+        logKeyChange(run, { type: 'run', message: `工作流开始运行` });
 
         logger.info('运行状态机...启动初始任务');
         const task = await createTask(run, 'initial')
@@ -45,7 +45,7 @@ const strategies = {
             logger.info('运行状态机...运行状态结束');
             dumpOutputParameters(run)
             logger.info('运行状态机...运行输出参数就位');
-            pushEvent(run, { type: 'run', message: `工作流结束` });
+            logKeyChange(run, { type: 'run', message: `工作流结束` });
             await saveRun(run)
             logger.info('运行状态机...运行已保存');
             await webhooks.runCompleted({ run })
@@ -131,7 +131,7 @@ const createNextTask = async (run, target, inputParameters, source, emitter, emi
     task.status = 'in-progress'
 
     if (task.name !== 'end') {
-        pushEvent(run, { type: 'task', message: `新增待办任务：${ task.title }` })
+        logKeyChange(run, { type: 'task', message: `新增待办任务：${ task.title }` })
         await webhooks.taskStarted({ run, taskId: task.id, emitter, emitterRule })
     }
 
@@ -155,7 +155,7 @@ const sendRequest = async (run, task, target) => {
     }
     task.requests.push(request)
     await webhooks.requestSent({ run, request })
-    pushEvent(run, { type: 'request', message: `待办任务${ task.title }已分配给${ target }` })
+    logKeyChange(run, { type: 'request', message: `待办任务${ task.title }已分配给${ target }` })
     // TODO: 向外部系发送
 
     return request
@@ -181,7 +181,7 @@ export const emitRunEvent = async (run, task, name, emitter, emitterRule) => {
     dumpOutputParameters(task)
     logger.info('触发事件...输出参数就位', name, run.id, task.id)
     if (task.name !== 'initial') {
-        task.endEventId = pushEvent(run, { type: 'task', message: `待办任务${ task.title }已完成：${ name }` })
+        task.endEventId = logKeyChange(run, { type: 'task', message: `待办任务${ task.title }已完成：${ name }` })
         await webhooks.taskCompleted({ run, task, event: name, emitter, emitterRule })
     }
 
@@ -268,11 +268,11 @@ export const respondRun = async (run, task, request, action, payload, operator) 
 
     request.responses ??= []
     request.responses.push({ action, payload, kind })
-    pushEvent(run, { type: 'request', message: `${ operator }${ actionTitle }了待办事项 ${ task.title }` })
+    logKeyChange(run, { type: 'request', message: `${ operator }${ actionTitle }了待办事项 ${ task.title }` })
     responds[kind](operator, run, task, request, action, payload,)
 }
 
-export const pushEvent = (run, event) => {
+export const logKeyChange = (run, event) => {
     const id = generateObjectID();
     run.events.push({ id, ...event });
     return id

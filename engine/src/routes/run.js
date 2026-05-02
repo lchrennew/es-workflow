@@ -1,5 +1,5 @@
 import { Controller } from "koa-es-template";
-import { loadRun, nextTick, pushEvent, respondRun, saveRun } from "../core/run.js";
+import { loadRun, nextTick, logKeyChange, respondRun, saveRun } from "../core/run.js";
 import { generateObjectID } from "es-object-id";
 
 export default class RunController extends Controller {
@@ -36,7 +36,7 @@ export default class RunController extends Controller {
             livingParameters: { ...inputParameters },
             outputParameters: {},
         }
-        pushEvent(run, { type: 'run', message: '已初始化' })
+        logKeyChange(run, { type: 'run', message: '已初始化' })
         await saveRun(run)
         this.logger.info('启动工作流...开始自动执行');
         nextTick(run)
