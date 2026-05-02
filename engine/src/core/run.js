@@ -33,10 +33,10 @@ const strategies = {
 
     running: async run => {
         logger.info('运行状态机...运行中');
-        const end = run.tasks.find(task => task.stateName === 'end' && task.status === 'in-progress');
+        const end = run.tasks.find(task => task.name === 'end' && task.status === 'in-progress');
 
         const ending = end
-            && run.tasks.every(task => task.stateName === 'end' || task.status !== 'in-progress');
+            && run.tasks.every(task => task.name === 'end' || task.status !== 'in-progress');
         if (ending) {
             logger.info('运行状态机...已确定将结束');
             end.status = 'completed'
@@ -61,11 +61,10 @@ const createTask = async (run, stateName, inputParameters = {}, source) => {
     const state = run.config.spec.states.find(({ name }) => name === stateName);
     const task = {
         id: generateObjectID(),
-        name: stateName,
+        name: state.name,
         emitter: state.emitter,
         emitterRules: state.emitterRules,
         transitions: state.transitions,
-        stateName,
         title: state.title,
         status: 'initial',
         requests: [],
@@ -74,10 +73,10 @@ const createTask = async (run, stateName, inputParameters = {}, source) => {
         outputParameters: {},
         source,
     }
-    logger.info('创建任务...已生成任务（初始状态）', run.id, stateName, task.id)
+    logger.info('创建任务...已生成任务（初始状态）', run.id, state.name, task.id)
 
     run.tasks.push(task)
-    logger.info('创建任务...任务已添加到队列', run.id, stateName, task.id)
+    logger.info('创建任务...任务已添加到队列', run.id, state.name, task.id)
     return task
 }
 
@@ -86,7 +85,7 @@ const createRequests = async (run, task) => {
     logger.info('创建目标任务...分析任务请求目标', run.id, task.id)
     const targets = (task.inputParameters['TMP_REQUEST_TARGETS'] ?? '').split(',').filter(Boolean)
 
-    if (!targets.length && task.stateName !== 'end') return ignoreTask(run, task)
+    if (!targets.length && task.name !== 'end') return ignoreTask(run, task)
 
     logger.info('创建目标任务...任务请求目标已确认', run.id, task.id)
     logger.info('创建目标任务...发送请求', run.id, task.id)
@@ -102,7 +101,7 @@ const ignoreTask = async (run, task) => {
     await saveRun(run)
     logger.info('忽略任务...已保存', run.id, task.id)
 
-    if (task.stateName !== 'end') {
+    if (task.name !== 'end') {
         logger.info('创建目标任务...不满足启动条件-触发ignored事件', run.id, task.id)
         await emitRunEvent(run, task, 'ignored',)
         logger.info('创建目标任务...不满足启动条件-结束创建过程', run.id, task.id)
@@ -131,7 +130,7 @@ const createNextTask = async (run, target, inputParameters, source, emitter, emi
     logger.info('创建目标任务...任务状态运行中', run.id, task.id)
     task.status = 'in-progress'
 
-    if (task.stateName !== 'end') {
+    if (task.name !== 'end') {
         pushEvent(run, { type: 'task', message: `新增待办任务：${ task.title }` })
         await webhooks.taskStarted({ run, taskId: task.id, emitter, emitterRule })
     }
@@ -140,12 +139,10 @@ const createNextTask = async (run, target, inputParameters, source, emitter, emi
 
     await saveRun(run)
     logger.info('创建目标任务...任务已保存', run.id, task.id)
-    if (task.stateName !== `end`) {
-    } else {
-        logger.info('创建目标任务...目标任务为结束任务', run.id, task.id)
-        logger.info('创建目标任务...自动结束任务', run.id, task.id)
-        await nextTick(run)
-    }
+    if (task.name !== `end`) return
+    logger.info('创建目标任务...目标任务为结束任务', run.id, task.id)
+    logger.info('创建目标任务...自动结束任务', run.id, task.id)
+    await nextTick(run)
 }
 
 const sendRequest = async (run, task, target) => {
@@ -183,7 +180,7 @@ export const emitRunEvent = async (run, task, name, emitter, emitterRule) => {
     logger.info('触发事件...任务完成', name, run.id, task.id)
     dumpOutputParameters(task)
     logger.info('触发事件...输出参数就位', name, run.id, task.id)
-    if (task.stateName !== 'initial') {
+    if (task.name !== 'initial') {
         task.endEventId = pushEvent(run, { type: 'task', message: `待办任务${ task.title }已完成：${ name }` })
         await webhooks.taskCompleted({ run, task, event: name, emitter, emitterRule })
     }
@@ -192,14 +189,13 @@ export const emitRunEvent = async (run, task, name, emitter, emitterRule) => {
     await saveRun(run)
     logger.info('触发事件...成功保存运行信息', name, run.id, task.id)
 
-    const state = run.config.spec.states.find(({ name }) => name === task.stateName)
-    logger.info('触发事件...已定位状态节点', name, run.id, task.id, task.stateName)
-    const transition = state.transitions.find(transition => transition.event === name)
+    logger.info('触发事件...已定位状态节点', name, run.id, task.id, task.name)
+    const transition = task.transitions.find(transition => transition.event === name)
     if (!transition) {
         logger.error('触发事件...未找到跳转链路')
         throw 'transition required'
     }
-    logger.info('触发事件...已定位跳转链路', name, run.id, task.id, task.stateName)
+    logger.info('触发事件...已定位跳转链路', name, run.id, task.id, task.name)
 
     logger.info('触发事件...目标任务已确定', name, run.id, task.id)
     for (const target of transition.targets) {
@@ -267,8 +263,7 @@ const responds = {
 }
 
 export const respondRun = async (run, task, request, action, payload, operator) => {
-    const state = run.config.spec.states.find(({ name }) => name === task.stateName)
-    const emitter = await getEmitter(state.emitter)
+    const emitter = await getEmitter(task.emitter)
     const { title: actionTitle, kind } = emitter.spec.actions.find(item => item.action === action)
 
     request.responses ??= []
