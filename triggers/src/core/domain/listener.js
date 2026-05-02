@@ -1,0 +1,54 @@
+import Trigger from "./trigger.js";
+import { getLogger } from "koa-es-template";
+import { client } from "../infrastructure/cac/client.js";
+import { ofType } from "../../utils/objects.js";
+import { DomainModel } from "cac-client";
+import ListenerInternalError from "./events/listener-internal-error.js";
+import ListenerInvoked from "./events/listener-invoked.js";
+
+const logger = getLogger('LISTENER')
+
+export default class Listener extends DomainModel {
+    static kind = 'listener'
+
+    /**
+     *
+     * @param name {string}
+     * @param title {string}
+     * @param triggers {string[]}
+     */
+    constructor(name, { title }, { triggers = [] }) {
+        super(Listener.kind, name, { title }, { triggers });
+    }
+
+    /**
+     *
+     * @return {Promise<Trigger[]>}
+     */
+    async #getTriggers() {
+        const kind = Trigger.kind
+        return ofType(await client.getMultiple(
+            this.spec.triggers.map(name => ({ kind, name }))
+        ), Trigger)
+    }
+
+    async invoke(context) {
+        const listenerInvoked = new ListenerInvoked(this, ...context.chain)
+        listenerInvoked.flush()
+        try {
+            const triggers = await this.#getTriggers()
+            triggers.forEach(
+                trigger => {
+                    trigger.invoke({
+                        ...context,
+                        chain: [ ...context.chain, listenerInvoked.eventID ],
+                        trigger: trigger.name
+                    })
+                }
+            )
+        } catch (error) {
+            logger.error(error)
+            new ListenerInternalError(error, ...context.chain)
+        }
+    }
+}

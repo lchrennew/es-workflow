@@ -1,0 +1,23 @@
+{
+  "name": "es-triggers",
+  "version": "1.0.0",
+  "main": "src/index.js",
+  "author": "Chun Li",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  },
+  "dependencies": {
+    "cac-client": "^1.0.6",
+    "dayjs": "^1.11.20",
+    "es-fetch-api": "^2.0.2",
+    "es-ioredis-url": "^1.0.13",
+    "es-object-id": "^1.0.0",
+    "koa-es-template": "^1.0.51",
+    "path-to-regexp": "^8.4.2"
+  }
+}
