@@ -12,7 +12,7 @@ import dayjs from "dayjs";
 
 const logger = getLogger('run');
 
-const strategies = {
+const nextTickStrategies = {
     initialized: async run => {
         logger.info('运行状态机...运行状态进行中');
         run.status = 'running'
@@ -231,7 +231,7 @@ const dumpOutputParameters = (parametersOwner) => {
  */
 export const nextTick = run => {
     logger.info('运行状态机...下一刻', run.id, run.status)
-    return strategies[run.status]?.(run);
+    return nextTickStrategies[run.status]?.(run);
 }
 
 /**
@@ -243,7 +243,7 @@ export const saveRun = run => DataSource.runs.save(run)
 
 export const loadRun = id => DataSource.runs.load(id)
 
-const responds = {
+const respondStrategies = {
     'decision': (operator, run, task, request,) =>
         executeEmitter({ run, task, request }),
     'update-task': async (operator, run, task, request, action, payload,) => {
@@ -269,7 +269,7 @@ export const respondRun = async (run, task, request, action, payload, operator) 
     request.responses ??= []
     request.responses.push({ action, payload, kind })
     logKeyChange(run, { type: 'request', message: `${ operator }${ actionTitle }了待办事项 ${ task.title }` })
-    responds[kind](operator, run, task, request, action, payload,)
+    respondStrategies[kind](operator, run, task, request, action, payload,)
 }
 
 export const logKeyChange = (run, event) => {
