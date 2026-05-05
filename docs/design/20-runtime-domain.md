@@ -40,7 +40,11 @@ class WorkflowRun {
 
 class WorkflowTask {
   +String id  %% ObjectID
-  +String stateName
+  +String name
+  +String conditions
+  +String emitter
+  +List~String~ emitterRules
+  +List~TaskTransition~ transitions
   +TaskSource source
   +String endEvent
   +String endEventId  %% ObjectID
@@ -55,6 +59,16 @@ class WorkflowTask {
 class TaskSource {
   +String parent  %% ObjectID
   +String name
+}
+
+class TaskTransition {
+  +String event
+  +List~TaskTransitionTarget~ targets
+}
+
+class TaskTransitionTarget {
+  +String state
+  +List~String~ prefetchers
 }
 
 class WorkflowRequest {
@@ -95,6 +109,8 @@ WorkflowTask *-- WorkflowRequest : requests
 WorkflowRequest *-- WorkflowResponse : responses
 WorkflowRun *-- WorkflowEvent : events
 WorkflowTask *-- TaskSource : source
+WorkflowTask *-- TaskTransition : transitions
+TaskTransition *-- TaskTransitionTarget : targets
 ```
 
 ### 字段说明（草案）
@@ -119,31 +135,41 @@ WorkflowTask *-- TaskSource : source
 ### 基本语义（已对齐）
 1. Task 是运行期值对象（VO），由 WorkflowRun 持有 `tasks: List<WorkflowTask>`
 2. 每当某个 **state 被激活**，都会产生一个新的 Task
-3. Task 初始状态为 `initialized`
-   - 若配置域 `WorkflowState.conditions` 通过：进入 `in-progress`
+3. **Task 是运行期状态快照（新增，已确认）**：
+   - 创建 Task 时，从对应 `WorkflowState` 复制运行所需字段到 Task：
+     - `name`
+     - `conditions`
+     - `emitter`
+     - `emitterRules`
+     - `transitions`
+   - 目的：
+     - 后续运行尽量不再依赖配置域中的原始 `state`
+     - 便于支持前/后加签等“动态增添任务”的运行期场景
+4. Task 初始状态为 `initialized`
+   - 若 `task.conditions` 通过：进入 `in-progress`
    - 若不通过：Task 进入 `Ignored`（自动终止的完成态），并统一触发内部事件 `ignored`
-4. Task 也拥有三段式参数：
+5. Task 也拥有三段式参数：
    - `inputParameters`：创建该 Task 时的输入参数（可来自 run.input/living 的快照，策略后续定）
    - `livingParameters`：Task 运行中的实时参数（仅开始后、结束前存在）
    - `outputParameters`：Task 结束后的结果参数（仅结束后存在）
-5. **Task 结束时参数回写（已确认）**：
+6. **Task 结束时参数回写（已确认）**：
    - 任一 Task 进入终态（`Completed` / `Ignored`）时，将 `task.outputParameters` 合并到 `run.livingParameters`
-6. **Task 进入 InProgress 时生成请求（已确认）**：
+7. **Task 进入 InProgress 时生成请求（已确认）**：
    - 若 `task.inputParameters` 中存在 `TMP_REQUEST_TARGETS`：
      - 将其值按英文逗号 `,` 分割为 target 列表（建议：trim 空格、忽略空项）
      - 为每个 target 创建一条 `WorkflowRequest`（写入 `task.requests`）
    - 若不存在该参数，则该 Task 默认不自动产生 request（是否仍可通过其他方式推进，后续再定）
-7. **Task 的可追溯来源（新增）**：
+8. **Task 的可追溯来源（新增）**：
    - `task.source.parent`：前序任务 id（ObjectId）。表示“是谁触发/推进到激活了本 state”
    - `task.source.name`：触发事件名（内部事件，即 `transition.event`，例如 `passed` / `rejected` / `b_skipped` / `start`）
    - 备注：`initial` 的 Task 可令 `source` 为空或由实现填充（例如 parent=null,name=null）
-8. **Task 的结束事件（新增）**：
+9. **Task 的结束事件（新增）**：
    - `task.endEvent`：Task 进入终态时记录的“结束事件名”（内部事件，即 `transition.event`）
    - `task.endEventId`：对应的 `WorkflowEvent.id`（ObjectId），用于精确关联导致任务结束的那条事件记录
    - 赋值规则：
      - `Ignored`：固定写入 `"ignored"`
      - `Completed`：写入导致该 Task 完成并推进到后续状态的事件名（例如 `"passed"` / `"rejected"` / `"start"`）
-9. **时间字段约定（新增）**：
+10. **时间字段约定（新增）**：
    - `task.id` 为 ObjectId，可从中推导创建时间，因此 Task 不单独保存 `createdAt`
    - 如需记录更新时刻，可保留 `task.updatedAt`（UTC 字符串）
 
@@ -180,8 +206,8 @@ stateDiagram
   - 过滤规则：key 以 `TMP_` 开头的参数视为临时参数，不进入 outputParameters，也不参与合并
 
 ### 特殊状态任务（强制语义）
-- `stateName="initial"`：任务创建即 `Completed`，并通过系统调用执行一次 emitterRules 产出事件 `"start"`（默认可用 `system/start/auto-start`）。
-- `stateName="end"`：任务创建即 `Completed`，并驱动 WorkflowRun 进入 `Completed`（结束）。
+- `task.name="initial"`：任务创建即 `Completed`，并通过系统调用执行一次 emitterRules 产出事件 `"start"`（默认可用 `system/start/auto-start`）。
+- `task.name="end"`：任务创建即 `Completed`，并驱动 WorkflowRun 进入 `Completed`（结束）。
 
 ---
 
@@ -331,15 +357,14 @@ Engine->>Run: set inputParameters
 Engine->>Run: init livingParameters(from input)
 Engine->>Run: status=Running
 Engine->>Run: activateState("initial")
-Engine->>Run: createTask(state="initial", status=Completed)\n(创建即完成)
-Engine->>Engine: emit(stateEmitterRules, task, request=null)\n(system invoke, 用于 initial)
+Engine->>Run: createTask(fromState="initial", snapshot name/conditions/emitter/emitterRules/transitions, status=Completed)\n(创建即完成)
+Engine->>Engine: emit(task.emitterRules, task, request=null)\n(system invoke, 用于 initial)
 Engine->>Engine: triggerEvent(runId, "start", payload?)\n(由 auto-start 规则产出)
 
 loop 运行循环（直到Run进入终态）
   Engine->>Run: pickNextTask()
   alt 取到Task(status=Initialized)
-    Engine->>Spec: getState(task.stateName)
-    Engine->>Cond: eval(state.conditions, run.livingParameters, task.livingParameters)
+    Engine->>Cond: eval(task.conditions, run.livingParameters, task.livingParameters)
     alt 条件满足
       Engine->>Run: task.status=InProgress
     else 条件不满足
@@ -371,7 +396,8 @@ end
 > - 依次执行 target.prefetchers（若有）  
 > - 激活目标 state 并创建对应 Task  
 >   - 若目标为 `end`：Task **创建即完成**，并驱动 WorkflowRun 进入 Completed  
->   - 否则：Task 初始为 Initialized；后续由 **state.conditions** 决定任务是否 InProgress 或 Ignored
+>   - 否则：Task 初始为 Initialized；后续由 **task.conditions** 决定任务是否 InProgress 或 Ignored
+> - 创建 Task 时，从目标 `WorkflowState` 复制 `name/conditions/emitter/emitterRules/transitions` 到 Task，形成运行期快照
 
 ```mermaid
 sequenceDiagram
@@ -388,16 +414,17 @@ opt 有payload
   Engine->>Run: merge payload into livingParameters
 end
 
-Engine->>Run: derive activeStates from unfinished tasks
-loop 对每个 activeState(派生)
-  Engine->>Spec: findTargets(activeState, eventName)
+Engine->>Run: derive activeTasks from unfinished tasks
+loop 对每个 activeTask
+  Engine->>Engine: findTargets(activeTask.transitions, eventName)
   loop 对每个 target
     opt target.prefetchers 非空
       Engine->>Pref: run(prefetchers, run/task params)
       Pref-->>Engine: fetched payload -> write livingParameters
     end
+    Engine->>Spec: getState(target.state)
     Engine->>Run: activateState(target.state)
-    Engine->>Run: createTask(state=target.state, status=Initialized)
+    Engine->>Run: createTask(fromState=target.state, snapshot name/conditions/emitter/emitterRules/transitions, status=Initialized)
   end
 end
 Engine->>Run: persist changes

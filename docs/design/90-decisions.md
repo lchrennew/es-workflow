@@ -31,6 +31,7 @@
 - [ADR-028：运行期对象使用 ObjectId 时不再保存 createdAt/occurredAt（时间从 ObjectId 推导）](./decisions/ADR-028.md)
 - [ADR-029：Emitter actions 增加 kind（decision/update-task），并通过 update-task response.payload 支持增删/作废请求](./decisions/ADR-029.md)
 - [ADR-030：移除 WorkflowRequest.status（以 voidInfo + responses 推导状态）](./decisions/ADR-030.md)
+- [ADR-031：WorkflowTask 持有运行期 State 快照（name/conditions/emitter/emitterRules/transitions）](./decisions/ADR-031.md)
 
 ## 历史（已废弃，仅保留用于追溯）
 

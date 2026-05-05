@@ -80,10 +80,14 @@
 
 ### WorkflowTask（工作流任务）
 - 含义：某个状态被激活后生成的运行期任务（值对象），用于承载“该状态对应的处理工作”。
+- 结构特点（新增）：
+  - `task.name`：对应状态名（运行期不再使用 `stateName` 命名）
+  - Task 在创建时会从 `WorkflowState` 复制运行所需字段形成快照：`conditions/emitter/emitterRules/transitions`
+  - 这样后续运行尽量不再依赖配置域中的原始 `state`，也便于支持前/后加签等动态增添任务场景
 - 生命周期（当前约定）：
   - 初始为 `initialized`
-  - 当配置域 `WorkflowState.conditions` 通过后进入 `in-progress`
-  - 当 `WorkflowState.conditions` 不通过时：进入 `Ignored`，并统一触发内部事件 `ignored`
+  - 当 `task.conditions` 通过后进入 `in-progress`
+  - 当 `task.conditions` 不通过时：进入 `Ignored`，并统一触发内部事件 `ignored`
   - 结束后产生 `outputParameters`
 - 参数：每个 Task 也拥有 `inputParameters/livingParameters/outputParameters` 三段式参数（作用域在 Task 内）。
   - 约定：Task 进入终态（Completed/Ignored）时，将 `task.outputParameters` 合并到 `run.livingParameters`。
