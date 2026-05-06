@@ -20,14 +20,12 @@ export default class RunController extends Controller {
         const { config, parameters: inputParameters } = ctx.request.body
         this.logger.info('启动工作流...已提取请求数据',);
 
-        const runNumber = 1
         const id = `${ config.name.replaceAll('/', '.') }.${ generateObjectID() }`
         this.logger.info('启动工作流...已生成运行ID',);
 
         const run = {
             id,
             name: config.name,
-            runNumber,
             config,
             status: 'initialized',
             tasks: [],

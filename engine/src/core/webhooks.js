@@ -7,7 +7,7 @@ const logger = getLogger("webhooks");
 class Webhooks {
 
     #getHookName(event) {
-        return `WEBHOOK_${ event.replaceAll('.', '_').toUpperCase() }`
+        return `WEBHOOK_${event.replaceAll('.', '_').toUpperCase()}`
     }
 
     async #trigger(event, payload) {

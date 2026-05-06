@@ -26,12 +26,16 @@
 - [ADR-022：在 WorkflowTask 上增加 endEvent 记录任务结束事件](./decisions/ADR-022.md)
 - [ADR-023：Prefetcher 参数声明字段命名为 parameters](./decisions/ADR-023.md)
 - [ADR-024：进入非 end 状态的迁移 target 必须配置“产出 TMP_REQUEST_TARGETS 的 prefetcher”](./decisions/ADR-024.md)
-- [ADR-025：引入 RequestSender 配置域（request target 前缀映射 name）](./decisions/ADR-025.md)
+- [ADR-025：引入 RequestSender 配置域（request target 前缀映射 name）](./decisions/ADR-025.md) **【已废弃】**
 - [ADR-027：区分 WorkflowEvent（人可读审计）与 Webhook（外部系统通知）](./decisions/ADR-027.md)
 - [ADR-028：运行期对象使用 ObjectId 时不再保存 createdAt/occurredAt（时间从 ObjectId 推导）](./decisions/ADR-028.md)
 - [ADR-029：Emitter actions 增加 kind（decision/update-task），并通过 update-task response.payload 支持增删/作废请求](./decisions/ADR-029.md)
 - [ADR-030：移除 WorkflowRequest.status（以 voidInfo + responses 推导状态）](./decisions/ADR-030.md)
-- [ADR-031：WorkflowTask 持有运行期 State 快照（name/conditions/emitter/emitterRules/transitions）](./decisions/ADR-031.md)
+- [ADR-031：WorkflowTask 持有运行期 State 快照（name/emitter/emitterRules/transitions，不含 conditions）](./decisions/ADR-031.md)
+- [ADR-032：移除 WorkflowRun.createdAt/updatedAt 和 runNumber，id 改为 `<工作流标识>.<ObjectId>`](./decisions/ADR-032.md)
+- [ADR-033：移除 WorkflowResponse.time（从 ObjectId 推导时间）](./decisions/ADR-033.md)
+- [ADR-034：移除 WorkflowTask.updatedAt（无需记录更新时间）](./decisions/ADR-034.md)
+- [ADR-035：移除 RequestSender 配置域，统一使用 Webhook 机制](./decisions/ADR-035.md)
 
 ## 历史（已废弃，仅保留用于追溯）
 

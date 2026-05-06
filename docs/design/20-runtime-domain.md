@@ -11,11 +11,12 @@
 ## 运行期静态模型：WorkflowRun（草案）
 
 ### 设计要点（来自你的约束）
-1. `WorkflowRun.id` 需要具备信息密度：`<工作流标识>.<工作流运行编号>`
-2. 其中工作流标识来自 `Workflow.name`，并将 `/` 替换为 `.`
-3. 每条工作流的运行编号从 `1` 开始自增；不同工作流互不影响
-4. 时间字段采用 UTC 字符串：`YYYY-MM-DD HH:mm:ss`
-5. 参数 key 命名与 value 类型约束：见配置域文档的“参数命名与类型规则（已确认）”
+1. `WorkflowRun.id` 格式：`<工作流标识>.<ObjectId>`
+   - 工作流标识来自 `Workflow.name`，并将 `/` 替换为 `.`
+   - ObjectId 部分用于唯一标识该次运行
+   - 示例：`order.approval.507f1f77bcf86cd799439011`
+2. 时间字段采用 UTC 字符串：`YYYY-MM-DD HH:mm:ss`
+3. 参数 key 命名与 value 类型约束：见配置域文档的"参数命名与类型规则（已确认）"
 
 ### 领域类图（Mermaid）
 ```mermaid
@@ -24,9 +25,8 @@ classDiagram
 direction LR
 
 class WorkflowRun {
-  +String id
+  +String id  %% ObjectID
   +String name
-  +String runNumber
   +Workflow config
   +WorkflowRunStatus status
   +List~WorkflowTask~ tasks
@@ -34,14 +34,11 @@ class WorkflowRun {
   +Map~String,String~ inputParameters
   +Map~String,String~ livingParameters
   +Map~String,String~ outputParameters
-  +String createdAt
-  +String updatedAt
 }
 
 class WorkflowTask {
   +String id  %% ObjectID
   +String name
-  +String conditions
   +String emitter
   +List~String~ emitterRules
   +List~TaskTransition~ transitions
@@ -53,7 +50,6 @@ class WorkflowTask {
   +Map~String,String~ inputParameters
   +Map~String,String~ livingParameters
   +Map~String,String~ outputParameters
-  +String updatedAt
 }
 
 class TaskSource {
@@ -92,7 +88,6 @@ class WorkflowResponse {
   +String action
   +String kind  %% decision | update-task
   +Map~String,Object~ payload
-  +String time
 }
 
 class WorkflowEvent {
@@ -114,11 +109,11 @@ TaskTransition *-- TaskTransitionTarget : targets
 ```
 
 ### 字段说明（草案）
-- `id`：`<workflowNameWithDots>.<runNumber>`
+- `id`：`<workflowNameWithDots>.<ObjectId>`
   - `workflowNameWithDots = name.replaceAll("/", ".")`
-  - 示例：`order.approval.3`
+  - 示例：`order.approval.507f1f77bcf86cd799439011`
+  - ObjectId 部分可用于提取创建时间
 - `name`：引用配置域 `Workflow.name`（path 形式）
-- `runNumber`：该 `name` 下的自增序号（从 1 开始）
 - `config`：创建该 WorkflowRun 时所使用的 Workflow 配置（快照/引用策略后续再定）
 - `status`：运行状态（见下方状态机草案）
 - `tasks`：任务列表（值对象）。每当某个状态被激活，会产生一个新的 Task（并行/汇合细节后续继续细化）
@@ -126,7 +121,6 @@ TaskTransition *-- TaskTransitionTarget : targets
 - `livingParameters`：运行中参数（字符串字典）  
   - 约定：任一 Task 结束（Completed / Ignored）时，将 `task.outputParameters` 合并到 `run.livingParameters`
 - `outputParameters`：输出参数（字符串字典）
-- `createdAt/updatedAt`：UTC 字符串时间，格式 `YYYY-MM-DD HH:mm:ss`
 
 ---
 
@@ -138,15 +132,16 @@ TaskTransition *-- TaskTransitionTarget : targets
 3. **Task 是运行期状态快照（新增，已确认）**：
    - 创建 Task 时，从对应 `WorkflowState` 复制运行所需字段到 Task：
      - `name`
-     - `conditions`
      - `emitter`
      - `emitterRules`
      - `transitions`
    - 目的：
      - 后续运行尽量不再依赖配置域中的原始 `state`
-     - 便于支持前/后加签等“动态增添任务”的运行期场景
+     - 便于支持前/后加签等"动态增添任务"的运行期场景
+   - 注：`conditions` 不需要快照，因为只在 Task 创建时执行一次判断，判断后不再使用
 4. Task 初始状态为 `initialized`
-   - 若 `task.conditions` 通过：进入 `in-progress`
+   - 创建时立即执行 `state.conditions` 判断（从配置域读取）
+   - 若 `conditions` 通过：进入 `in-progress`
    - 若不通过：Task 进入 `Ignored`（自动终止的完成态），并统一触发内部事件 `ignored`
 5. Task 也拥有三段式参数：
    - `inputParameters`：创建该 Task 时的输入参数（可来自 run.input/living 的快照，策略后续定）
@@ -171,7 +166,7 @@ TaskTransition *-- TaskTransitionTarget : targets
      - `Completed`：写入导致该 Task 完成并推进到后续状态的事件名（例如 `"passed"` / `"rejected"` / `"start"`）
 10. **时间字段约定（新增）**：
    - `task.id` 为 ObjectId，可从中推导创建时间，因此 Task 不单独保存 `createdAt`
-   - 如需记录更新时刻，可保留 `task.updatedAt`（UTC 字符串）
+   - Task 不保存 `updatedAt`，因为没有必要记录更新时间
 
 ### Fork/Join（当前取向）
 当前版本优先采用“事件驱动 + 启动条件不通过触发事件/忽略任务”的低复杂度方案，不引入 ForkID 机制。
@@ -265,7 +260,9 @@ stateDiagram
   - `by`：作废操作者标识
   - `newRequestId`：后续新 requestId（可空；删除请求/纯作废时为空）
 - `WorkflowResponse.id`：ObjectId（用于幂等与追溯；可从中推导创建时间）
-- `WorkflowResponse.action/payload/time`：响应动作、响应数据与响应时间（UTC 字符串，同格式）。
+- `WorkflowResponse.action`：响应动作标识
+- `WorkflowResponse.kind`：操作类别（decision/update-task），由引擎根据 emitter 配置派生
+- `WorkflowResponse.payload`：响应数据（Map<String,Object>）
 
 ### 基于参数的发请求方案（已确认）
 - 参数名：`TMP_REQUEST_TARGETS`
@@ -274,18 +271,13 @@ stateDiagram
   - 示例：`user:10086,user:10010,sys:risk`
 - 生成规则：Task 进入 `InProgress` 时按该列表生成 `task.requests`
 
-### RequestSender 参与时机（新增）
-> 说明：`WorkflowRequest` 生成后需要“投递到外部系统/通道”，由 RequestSender 负责。
-1. 对每个 `WorkflowRequest.target`（形如 `<senderName>:<ref>`），解析得到 `senderName/ref`
-2. 按 `senderName` 加载 `RequestSender(kind="request-sender", name=senderName)`
-3. 执行 `sender.spec.script` 完成发送，并将发送回执/状态写入 request（字段待你后续确认）
-
 ### Webhook 参与时机（运行逻辑扩展点）
 > 说明：
 > - webhook 不作为独立配置领域建模，仅在运行逻辑中定义触发点与 payload 约定
 > - 投递语义：至多一次（发送失败不重试）
 > - `initial/end` 两个系统保留状态的 task 不触发 webhook
 > - `Ignored` 不触发 webhook
+> - **Webhook 职责**：既用于事件通知（如 run.started、task.completed），也用于发送 WorkflowRequest（通过 request.target 指定 webhook URL）
 >
 > 概念辨析（重要）：
 > - webhook：面向外部系统集成（外部系统可读）
@@ -302,7 +294,7 @@ stateDiagram
 > | `run.completed` | run 到达 `end` 并进入 `Completed` | `run`（WorkflowRun，全量） |
 > | `task.started` | 非 `initial/end` 的 task 进入 `InProgress` | `run`（全量）；`taskId`；`emitter`（上游任务的 emitter 实体对象） |
 > | `task.completed` | 非 `initial/end` 的 task 进入 `Completed`（Ignored 不触发） | `run`（全量）；`taskId`；`event`（导致任务结束的事件）；`emitter`（触发事件的 emitter 实体对象）；`emitterRule`（触发事件的规则实体对象） |
-> | `request.sent` | RequestSender 成功投递某条 request 后 | `run`（全量）；`taskId`；`request`（WorkflowRequest 实体）；`emitter`（当前任务的 emitter 实体对象） |
+> | `request.sent` | Webhook 成功投递某条 request 后 | `run`（全量）；`taskId`；`request`（WorkflowRequest 实体）；`emitter`（当前任务的 emitter 实体对象） |
 > | `response.received` | 外部系统提交 response 后（写入 request.response 成功） | `run`（全量）；`taskId`；`requestId`；`payload`（应答 payload） |
 > | `task.updated` | 非 `initial/end` 的 task 发生更新后（用于可视化刷新；Ignored 不触发） | `run`（全量）；`task`（更新后的 WorkflowTask，全量） |
 
@@ -352,12 +344,12 @@ participant Third as 第三方处理方
 
 Caller->>Engine: startRun(name, inputParameters)
 Engine->>Spec: loadWorkflow(name)
-Engine->>Run: create(id,name,runNumber,config)\nstatus=Initialized
+Engine->>Run: create(id,name,config)\nstatus=Initialized
 Engine->>Run: set inputParameters
 Engine->>Run: init livingParameters(from input)
 Engine->>Run: status=Running
 Engine->>Run: activateState("initial")
-Engine->>Run: createTask(fromState="initial", snapshot name/conditions/emitter/emitterRules/transitions, status=Completed)\n(创建即完成)
+Engine->>Run: createTask(fromState="initial", snapshot name/emitter/emitterRules/transitions, status=Completed)\n(创建即完成)
 Engine->>Engine: emit(task.emitterRules, task, request=null)\n(system invoke, 用于 initial)
 Engine->>Engine: triggerEvent(runId, "start", payload?)\n(由 auto-start 规则产出)
 
@@ -374,7 +366,7 @@ loop 运行循环（直到Run进入终态）
   else 取到Task(status=InProgress)
     opt 需要外部处理
       Engine->>Third: sendRequest(runId, taskId, target)
-      Third-->>Engine: response(action, payload, time)
+      Third-->>Engine: response(action, payload)
       Engine->>Run: write parameters (run/task)
     end
     Engine->>Engine: triggerEvent(runId, eventName, payload?)
@@ -424,7 +416,7 @@ loop 对每个 activeTask
     end
     Engine->>Spec: getState(target.state)
     Engine->>Run: activateState(target.state)
-    Engine->>Run: createTask(fromState=target.state, snapshot name/conditions/emitter/emitterRules/transitions, status=Initialized)
+    Engine->>Run: createTask(fromState=target.state, snapshot name/emitter/emitterRules/transitions, status=Initialized)
   end
 end
 Engine->>Run: persist changes
@@ -473,7 +465,7 @@ stateDiagram
 stateDiagram
   [*] --> RequestSent: 发送request(runId,taskId,target)
   RequestSent --> WaitResponse: 等待response
-  WaitResponse --> ResponseArrived: 收到response(action,payload,time)
+  WaitResponse --> ResponseArrived: 收到response(action,payload)
 
   ResponseArrived --> Emit: emit(stateEmitterRules, task, request)\n仅 decision response 触发 emit
   Emit --> EventProduced: 产出事件\neventName=event.name\n创建WorkflowEvent

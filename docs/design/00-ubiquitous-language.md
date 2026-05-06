@@ -71,18 +71,19 @@
   - 除 `initial` 外的所有状态都必须存在一条“从 `initial` 到达该状态”的路径（避免不可达孤岛节点）
   - 除 `end` 外的所有状态都必须存在一条“到达 `end` 的路径”（允许环路，但环路必须有通向 `end` 的出口，避免闭环孤岛）
 
-### id（运行标识）
-- 形式：`<工作流标识>.<工作流运行编号>`
+### WorkflowRun.id（运行标识）
+- 形式：`<工作流标识>.<ObjectId>`
 - 说明：
   - 工作流标识来源于 `Workflow.name`，并将 `/` 替换为 `.`
-  - 运行编号从 `1` 开始自增；每条工作流各自独立计数，互不干扰
-  - 示例：Workflow.name=`order/approval`，则 id 可为 `order.approval.1`
+  - ObjectId 部分用于唯一标识该次运行，可从中提取创建时间戳
+  - 示例：Workflow.name=`order/approval`，则 id 可为 `order.approval.507f1f77bcf86cd799439011`
 
 ### WorkflowTask（工作流任务）
-- 含义：某个状态被激活后生成的运行期任务（值对象），用于承载“该状态对应的处理工作”。
+- 含义：某个状态被激活后生成的运行期任务（值对象），用于承载"该状态对应的处理工作"。
 - 结构特点（新增）：
   - `task.name`：对应状态名（运行期不再使用 `stateName` 命名）
-  - Task 在创建时会从 `WorkflowState` 复制运行所需字段形成快照：`conditions/emitter/emitterRules/transitions`
+  - Task 在创建时会从 `WorkflowState` 复制运行所需字段形成快照：`emitter/emitterRules/transitions`
+  - `conditions` 不需要快照，因为只在创建时执行一次判断，判断后不再使用
   - 这样后续运行尽量不再依赖配置域中的原始 `state`，也便于支持前/后加签等动态增添任务场景
 - 生命周期（当前约定）：
   - 初始为 `initialized`
@@ -115,20 +116,14 @@
 - 特征：
   - 一个 Task 可以产生多个 request
   - 每个 request 可以对应多个 response（response 作为日志）；其中最多有 1 个“决策类 action”的 response，且必须排在最后
-  - request 可包含第三方标识（例如 `user:<工号>` / `sys:<系统标识>`）用于路由与审计
+  - request.target：目标处理方标识（如 `user:<工号>` / `sys:<系统标识>` / `webhook:<url>`），用于路由与审计
   - 撤回响应（留痕）：不置空 response；将原 request 标记为作废（voided），并创建新的 request 重新发起（见运行域）
-
-### RequestSender（请求发送器配置）
-- 含义：独立业务领域中的配置实体，用于把运行期生成的 `WorkflowRequest` 投递到外部系统/通道。
-- 配置结构：`kind/name/metadata/spec`
-- kind（已确认）：`request-sender`
-- 映射规则（强约束）：request target 表达式为 `<senderName>:<ref>`，其中 `senderName` 必须等于 `RequestSender.name`
-- spec：仅包含 `script`（运行时默认按 JavaScript 执行；script 仅填写 content，运行时按统一函数签名包装；详见 `17-request-sender-domain.md`）
 
 ### Webhook（运行期通知机制）
 - 含义：引擎在运行期关键时机向外部系统投递通知的机制；不作为独立配置领域建模，仅作为运行逻辑的扩展点描述。
 - 语义：至多一次（不重试）
 - 触发点：见运行域 `20-runtime-domain.md` 中的 “Webhook 参与时机”
+- 说明：Webhook 既用于事件通知（如 run.started、task.completed），也用于发送需要响应的请求（通过 WorkflowRequest 机制）
 
 ### WorkflowEmitter（事件触发器）
 - 含义：由配置域指定的触发策略，用于在收到 response 时决定“是否触发事件推进工作流运行”。
