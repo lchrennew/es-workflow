@@ -1,0 +1,8 @@
+{
+  "api": {
+    "static": "http://pippy:8084",
+    "triggers": "http://pippy:8088",
+    "trigger-ui": "http://pippy:8084/triggers"
+  },
+  "primaryColor": "#8b36b1"
+}

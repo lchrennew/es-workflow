@@ -11,13 +11,7 @@ export default class Index extends Controller {
 
         this.use('/hook', Hook)
         this.use('/adapt', Adapt)
-        const tempProtection = async (ctx, next) => {
-            if (ctx.method !== 'OPTIONS' && ctx.headers['pippy'] !== 'xxx') {
-                ctx.status = 403
-                ctx.body = { error: 'Forbidden' }
-            } else await next()
-        }
-        this.use('/admin-api', AdminApi, tempProtection)
+        this.use('/admin-api', AdminApi)
         this.use('/client-api', ClientApi)
     }
 
