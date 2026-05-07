@@ -1,4 +1,5 @@
 *.local
 *.lock
-package-lock.json
 node_modules
+*-lock.json
+.trae
