@@ -65,16 +65,18 @@ Template 和 TargetSystem 中支持 5 种变量替换格式：
 
 ## Naming Conventions
 
-1. **配置名称**：使用 kebab-case（例如：`my-trigger`, `github-webhook`）
-2. **variables 字段名**：必须使用 UPPER_SNAKE_CASE（例如：`PROJECT_ID`, `USER_NAME`）
-3. **namespace**：必须以 `/` 开头或为空字符串（例如：`/prod`, `/staging`, `''`）
-   - ✅ 推荐: `/prod`, `/staging`, `/dev`
-   - ❌ 避免: `/abc` 和 `/abcd` (前缀冲突)
-   - ❌ 避免: `/prod` 和 `/production` (前缀冲突)
-   - 原因: CAC 使用 `startsWith()` 查找,缺少差异字符 `.` 导致 `/abc` 会匹配 `/abc.yaml` 和 `/abcd.yaml`
-4. **特殊字段例外**：
-   - `variables['@']` - 环境选择器
-   - `variables['~']` - 默认 namespace (必须以 `/` 开头)
+- **配置名称 (name)**: 使用 kebab-case (例如: `github-webhook`, `deploy-trigger`)
+- **变量名称 (variables)**: 使用 UPPER_SNAKE_CASE (例如: `USER_ID`, `ACTION_TYPE`)
+- **特殊变量**: `variables['@']` (环境选择器), `variables['~']` (默认 namespace)
+- **Namespace**: 必须以 `/` 开头或为空字符串,避免前缀重叠 (例如: `/prod`, `/staging`)
+
+**详细规范**: 参见 [命名规范](references/NAMING-CONVENTIONS.md)
+
+**重要提醒**:
+- ⚠️ **Namespace 前缀冲突**: 避免使用前缀重叠的 namespace 名称
+  - ❌ 避免: `/abc` 和 `/abcd`, `/prod` 和 `/production`
+  - ✅ 推荐: `/prod`, `/staging`, `/dev`
+  - 详见: [Trigger 配置文档](references/config-types/trigger.md)
 
 ## Instructions
 
@@ -124,75 +126,48 @@ Template 和 TargetSystem 中支持 5 种变量替换格式：
 2. 添加适当的注释说明关键字段
 3. 确保缩进正确（使用 2 空格）
 4. 多行脚本使用 `|` 符号
-5. 文件命名建议：`{kind}/{name}.yaml`
+5. **文件路径**: 保存到 `cac-configs/{kind}/{name}.yaml`
+   - 详细规则: [配置文件路径规则](references/FILE-PATH-RULES.md)
+6. **命名规范**: 配置名称使用 kebab-case,变量名称使用 UPPER_SNAKE_CASE
+   - 详细规则: [命名规范](references/NAMING-CONVENTIONS.md)
 
 ### 7. 提供使用说明
 生成配置后，告知用户：
-1. 配置文件应该保存的位置
-2. 如何通过 CAC API 提交配置
-3. 配置之间的依赖关系
-4. 如何测试配置是否生效
+1. 配置文件已保存到 `cac-configs/{kind}/{name}.yaml`
+2. 配置之间的依赖关系
+3. 如何测试配置是否生效
 
 ## Common Workflows
 
 ### Workflow 1: 简单的 Webhook 转发
+接收外部 webhook (如 GitHub, GitLab),转发到内部 API。
 
-**场景**：接收 GitHub webhook，转发到内部 API
-
-**需要的配置**：
-1. target-system - 定义内部 API 地址
-2. template - 定义转发请求格式
-3. binding - 提取 webhook 数据
-4. source-interceptor - 过滤请求
-5. target-interceptor - 控制发送
-6. trigger - 串联所有配置
-7. target-request - 定义输出请求
-8. listener - 定义 webhook 入口
-
-**完整示例**：参见 [workflow-example.yaml](assets/workflow-example.yaml)
+**需要的配置**: TargetSystem → Template → Binding → SourceInterceptor → TargetInterceptor → Trigger → TargetRequest → Listener
 
 ### Workflow 2: 数据聚合和适配
+聚合多个微服务数据并返回给前端,作为 BFF 层。
 
-**场景**：聚合多个微服务数据并返回给前端
+**需要的配置**: TargetSystem → Template → Binding → SourceInterceptor → AdaptorRequest → Adaptor
 
-**需要的配置**：
-1. target-system - 定义各个微服务地址
-2. template - 定义各个请求格式
-3. binding - 提取请求参数
-4. source-interceptor - 验证请求权限
-5. adaptor-request - 定义各个数据请求
-6. adaptor - 聚合数据并返回
-
-**关键特点**：
-- 使用 `/adapt/:name` 路由访问
-- 返回自定义数据结构
-- 支持输出缓存
-- 支持被动模式按需加载
+**关键特点**: 使用 `/adapt/:name` 路由,返回自定义数据结构,支持输出缓存和被动模式
 
 ### Workflow 3: 条件转发
+根据请求内容或变量条件决定是否转发。
 
-**场景**：根据请求内容决定是否转发
-
-**关键配置**：
-- source-interceptor: 检查请求条件
-- target-interceptor: 检查变量条件
-- binding: 设置条件变量
+**关键配置**: SourceInterceptor (输入拦截), TargetInterceptor (输出拦截)
 
 ### Workflow 4: 一对多转发
+一个输入请求触发多个输出请求,发送到不同的目标系统。
 
-**场景**：一个输入请求触发多个输出请求
-
-**关键配置**：
-- 多个 target-request 配置（同一个 trigger）
-- 可选的 target-requests-collector 收集结果
+**关键配置**: 多个 target-request 配置,可选的 target-requests-collector 收集结果
 
 ### Workflow 5: 多环境配置
+根据环境动态选择目标系统或 target-request。
 
-**场景**：根据环境动态选择目标系统
+**方式 1**: 使用 `variables['@']` 选择 target-system 的环境
+**方式 2**: 使用 namespace 选择不同的 target-request
 
-**关键配置**：
-- binding: 设置 `variables['@']` 选择环境
-- target-system: 定义多个环境的 URL
+**详细工作流**: 参见 [常见工作流](references/WORKFLOWS.md)
 
 ## Script Guidelines
 
@@ -263,7 +238,11 @@ Template 和 TargetSystem 中支持 5 种变量替换格式：
 - **[配置类型详细参考](references/config-types/README.md)** - 11 种配置类型的完整字段说明
 - **[变量替换详细参考](references/variables/README.md)** - 5 种变量替换格式的详细说明和示例
 - **[脚本示例参考](references/examples/README.md)** - 各种脚本字段的实用示例
+- **[常见工作流](references/WORKFLOWS.md)** - 7 种常见使用场景和配置模式
+- **[配置文件路径规则](references/FILE-PATH-RULES.md)** - 文件组织和路径规范
+- **[命名规范](references/NAMING-CONVENTIONS.md)** - 配置名称和变量命名规范
 - **[完整配置示例](assets/workflow-example.yaml)** - GitHub webhook 转发的完整配置
+- **[Adaptor 配置示例](assets/adaptor-example.yaml)** - 用户仪表盘数据聚合的完整配置
 
 ## Notes
 
