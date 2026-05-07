@@ -1,20 +1,19 @@
 import { getData } from "../utils/api.js";
-import { json } from "es-fetch-api/middlewares/body.js";
+import { json } from 'es-fetch-api/middlewares/body.js';
+import { POST } from 'es-fetch-api/middlewares/methods.js';
 import { getLogger } from "koa-es-template";
 
 const logger = getLogger("webhooks");
 
 class Webhooks {
 
-    #getHookName(event) {
-        return `WEBHOOK_${event.replaceAll('.', '_').toUpperCase()}`
-    }
+    #getHookName = event => `WEBHOOK_${ event.replaceAll('.', '_').toUpperCase() }`;
 
     async #trigger(event, payload) {
         try {
-            const webhook = this.#getHookName(event)
+            const webhook = process.env[this.#getHookName(event)]
             if (!webhook) {
-                const result = await getData(webhook, json(payload))
+                const result = await getData(webhook, POST, json(payload))
                 logger.info(event, result)
             }
         } catch (err) {
