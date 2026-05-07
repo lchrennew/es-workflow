@@ -12,6 +12,8 @@ spec:
     variables.WORKFLOW_NAME = body.run?.workflowName || '';
     variables.RUN_STATUS = body.run?.status || '';
     variables.TASK_STATUS = body.task?.status || '';
+    variables.ACTION = body.action || '';
+    variables.REASON = body.reason || '';
     variables.TIMESTAMP = dayjs().unix();
     
     variables.RUN = JSON.stringify(body.run || {});

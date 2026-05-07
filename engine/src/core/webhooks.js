@@ -48,6 +48,10 @@ class Webhooks {
     taskUpdated({ run, task }) {
         return this.#trigger('task.updated', { run, task })
     }
+
+    requestVoid = async ({ run, task, request, action, reason, }) => {
+        return this.#trigger('request.void', { run, task, request, action, reason })
+    }
 }
 
 export default new Webhooks()

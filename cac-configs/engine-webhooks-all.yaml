@@ -24,6 +24,8 @@ spec:
     variables.WORKFLOW_NAME = body.run?.workflowName || '';
     variables.RUN_STATUS = body.run?.status || '';
     variables.TASK_STATUS = body.task?.status || '';
+    variables.ACTION = body.action || '';
+    variables.REASON = body.reason || '';
     variables.TIMESTAMP = dayjs().unix();
     
     variables.RUN = JSON.stringify(body.run || {});
@@ -59,6 +61,7 @@ spec:
       'task.started',
       'task.completed',
       'request.sent',
+      'request.void',
       'response.received',
       'task.updated'
     ];
@@ -197,6 +200,34 @@ spec:
 
 ---
 kind: template
+name: engine-request-void-template
+metadata:
+  title: Engine request.void 事件模板
+spec:
+  path: /request-void
+  method: POST
+  format: json
+  headers:
+    Content-Type: application/json
+    X-Webhook-Event: request.void
+    X-Run-ID: $RUN_ID$
+    X-Task-ID: $TASK_ID$
+    X-Request-ID: $REQUEST_ID$
+  body:
+    eventType: request.void
+    runId: $RUN_ID$
+    taskId: $TASK_ID$
+    requestId: $REQUEST_ID$
+    workflowId: $WORKFLOW_ID$
+    timestamp: $(Number)TIMESTAMP$
+    action: $ACTION$
+    reason: $REASON$
+    run: $...RUN$
+    task: $...TASK$
+    request: $...REQUEST$
+
+---
+kind: template
 name: engine-response-received-template
 metadata:
   title: Engine response.received 事件模板
@@ -302,6 +333,18 @@ spec:
   targetInterceptor: never-intercept
   binding: engine-webhook-binding
   template: engine-request-sent-template
+  targetSystem: engine-webhook-api
+
+---
+kind: trigger
+name: engine-request-void-trigger
+metadata:
+  title: Engine request.void 触发器
+spec:
+  sourceInterceptor: engine-webhook-filter
+  targetInterceptor: never-intercept
+  binding: engine-webhook-binding
+  template: engine-request-void-template
   targetSystem: engine-webhook-api
 
 ---
@@ -430,6 +473,26 @@ spec:
 
 ---
 kind: target-request
+name: engine-request-void
+metadata:
+  title: Engine request.void 目标请求
+spec:
+  props:
+    trigger: engine-request-void-trigger
+    binding: engine-webhook-binding
+    template: engine-request-void-template
+    targetSystem: engine-webhook-api
+  errorTracking:
+    enabled: true
+    eventName: engine-webhook-forward-failed
+  postResponseScript: |
+    console.log('request.void webhook forwarded:', response?.status);
+    if (!response?.ok) {
+      console.error('Forward failed:', response?.statusText);
+    }
+
+---
+kind: target-request
 name: engine-response-received
 metadata:
   title: Engine response.received 目标请求
@@ -512,6 +575,15 @@ metadata:
 spec:
   triggers:
     - engine-request-sent-trigger
+
+---
+kind: listener
+name: engine-request-void-listener
+metadata:
+  title: Engine request.void 监听器
+spec:
+  triggers:
+    - engine-request-void-trigger
 
 ---
 kind: listener

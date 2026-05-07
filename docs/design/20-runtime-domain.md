@@ -215,6 +215,13 @@ stateDiagram
    - 每个 request 的 responses 中，最多只能有 1 个“决策类 action”的 response
    - 且该决策类 response 必须排在最后（即一旦出现决策类 response，该 request 后续不再接受任何 response）
 4. `WorkflowResponse.kind`（新增）：由引擎在写入 response 时根据 emitter 的 `actions[action].kind` 派生并固化，便于规则脚本做过滤与统计（忽略 update-task 日志）。
+5. **事件提交后的请求自动作废（新增）**：
+   - 触发时机：当某条 `emitterRule` 产出内部事件，并被引擎**提交**（写入 `WorkflowEvent` 且后续触发 `triggerEvent` 推进状态机）时
+   - 处理规则：引擎应将当前 `task` 下所有满足以下条件的 request 批量标记为作废（写入 `voidInfo`）：
+     - `voidInfo == null` 且
+     - `responses` 中不存在 `kind="decision"` 的 response（即“尚未得到 decision 应答”的 request）
+   - 强约束：**作废的 request 不能被应答**（外部提交 response 时，若 `request.voidInfo != null` 则拒绝写入）
+   - 并发要求：提交事件（event）与批量作废 pending-requests 应作为同一原子更新完成（同一 task 的乐观锁/事务边界内）
 
 ### 更新任务类响应（新增）
 > 说明：部分 `response.action` 不用于推进状态机，而用于更新当前 Task（例如加签：新增请求；作废请求；撤回响应并重新发起）。
@@ -295,7 +302,8 @@ stateDiagram
 > | `task.started` | 非 `initial/end` 的 task 进入 `InProgress` | `run`（全量）；`taskId`；`emitter`（上游任务的 emitter 实体对象） |
 > | `task.completed` | 非 `initial/end` 的 task 进入 `Completed`（Ignored 不触发） | `run`（全量）；`taskId`；`event`（导致任务结束的事件）；`emitter`（触发事件的 emitter 实体对象）；`emitterRule`（触发事件的规则实体对象） |
 > | `request.sent` | Webhook 成功投递某条 request 后 | `run`（全量）；`taskId`；`request`（WorkflowRequest 实体）；`emitter`（当前任务的 emitter 实体对象） |
-> | `response.received` | 外部系统提交 response 后（写入 request.response 成功） | `run`（全量）；`taskId`；`requestId`；`payload`（应答 payload） |
+> | `request.void` | 某条 request 被作废后（写入 `request.voidInfo` 成功） | `run`（全量）；`taskId`；`request`（作废后的 WorkflowRequest 实体，全量） |
+> | `response.received` | 外部系统提交 response 后（写入 request.responses 成功） | `run`（全量）；`taskId`；`requestId`；`payload`（应答 payload） |
 > | `task.updated` | 非 `initial/end` 的 task 发生更新后（用于可视化刷新；Ignored 不触发） | `run`（全量）；`task`（更新后的 WorkflowTask，全量） |
 
 ---
@@ -356,7 +364,8 @@ Engine->>Engine: triggerEvent(runId, "start", payload?)\n(由 auto-start 规则�
 loop 运行循环（直到Run进入终态）
   Engine->>Run: pickNextTask()
   alt 取到Task(status=Initialized)
-    Engine->>Cond: eval(task.conditions, run.livingParameters, task.livingParameters)
+    Engine->>Spec: getState(task.name)
+    Engine->>Cond: eval(state.conditions, run.livingParameters, task.livingParameters)
     alt 条件满足
       Engine->>Run: task.status=InProgress
     else 条件不满足
@@ -388,8 +397,8 @@ end
 > - 依次执行 target.prefetchers（若有）  
 > - 激活目标 state 并创建对应 Task  
 >   - 若目标为 `end`：Task **创建即完成**，并驱动 WorkflowRun 进入 Completed  
->   - 否则：Task 初始为 Initialized；后续由 **task.conditions** 决定任务是否 InProgress 或 Ignored
-> - 创建 Task 时，从目标 `WorkflowState` 复制 `name/conditions/emitter/emitterRules/transitions` 到 Task，形成运行期快照
+>   - 否则：Task 初始为 Initialized；创建时读取 `state.conditions` 进行一次判断，决定进入 InProgress 或 Ignored
+> - 创建 Task 时，从目标 `WorkflowState` 复制 `name/emitter/emitterRules/transitions` 到 Task，形成运行期快照（不含 conditions）
 
 ```mermaid
 sequenceDiagram
@@ -468,7 +477,7 @@ stateDiagram
   WaitResponse --> ResponseArrived: 收到response(action,payload)
 
   ResponseArrived --> Emit: emit(stateEmitterRules, task, request)\n仅 decision response 触发 emit
-  Emit --> EventProduced: 产出事件\neventName=event.name\n创建WorkflowEvent
+  Emit --> EventProduced: 产出事件\neventName=event.name\n创建WorkflowEvent\n并自动作废本task下所有未得到decision应答的request
   Emit --> NoEvent: 不产出事件
 
   EventProduced --> [*]

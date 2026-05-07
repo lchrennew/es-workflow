@@ -1,0 +1,7 @@
+kind: listener
+name: engine-request-void-listener
+metadata:
+  title: Engine request.void 监听器
+spec:
+  triggers:
+    - engine-request-void-trigger

@@ -36,6 +36,7 @@
 - [ADR-033：移除 WorkflowResponse.time（从 ObjectId 推导时间）](./decisions/ADR-033.md)
 - [ADR-034：移除 WorkflowTask.updatedAt（无需记录更新时间）](./decisions/ADR-034.md)
 - [ADR-035：移除 RequestSender 配置域，统一使用 Webhook 机制](./decisions/ADR-035.md)
+- [ADR-036：事件提交后自动作废未决策请求，作废请求不可应答](./decisions/ADR-036.md)
 
 ## 历史（已废弃，仅保留用于追溯）
 

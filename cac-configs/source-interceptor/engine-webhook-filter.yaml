@@ -20,6 +20,7 @@ spec:
       'task.started',
       'task.completed',
       'request.sent',
+      'request.void',
       'response.received',
       'task.updated'
     ];

@@ -117,7 +117,7 @@ const createNextTask = async (run, target, inputParameters, source, emitter, emi
     if (nextState.conditions) {
         logger.info('创建目标任务...启动条件检查', run.id, task.id)
         const script = `async task => {
-            ${nextState.conditions}
+            ${ nextState.conditions }
         }`
         const { check } = importNamespace(exportName('check', script))
         const metCondition = await check(staticClone(task))
@@ -131,7 +131,7 @@ const createNextTask = async (run, target, inputParameters, source, emitter, emi
     task.status = 'in-progress'
 
     if (task.name !== 'end') {
-        logKeyChange(run, { type: 'task', message: `新增待办任务：${task.title}` })
+        logKeyChange(run, { type: 'task', message: `新增待办任务：${ task.title }` })
         await webhooks.taskStarted({ run, taskId: task.id, emitter, emitterRule })
     }
 
@@ -155,32 +155,38 @@ const sendRequest = async (run, task, target) => {
     }
     task.requests.push(request)
     await webhooks.requestSent({ run, request })
-    logKeyChange(run, { type: 'request', message: `待办任务${task.title}已分配给${target}` })
+    logKeyChange(run, { type: 'request', message: `待办任务${ task.title }已分配给${ target }` })
 
     return request
 }
 
-const voidRequest = async (run, task, requestId, action, reason, operator, addedRequests) => {
+export const voidRequest = async (run, task, requestId, action, reason, operator, addedRequests,) => {
     logger.info('作废任务请求', run.id, task.id, requestId, action, reason)
     const request = task.requests.find(request => request.id === requestId)
+    if (!request || request.voidInfo || request.responses?.at(-1)?.kind === 'decision') return
     request.voidInfo = {
         voidedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
         by: operator,
         reason,
         newRequestId: addedRequests[request.target]
     }
-
+    await webhooks.requestVoid({run, task, request, action, reason})
 }
 
 export const emitRunEvent = async (run, task, name, emitter, emitterRule) => {
     logger.info('触发事件...', name, run.id, task.id)
     task.endEvent = name
     task.status = 'completed'
+
+    for (const request of task.requests ?? []) {
+        await voidRequest(run, task, request?.id, '@task/complete', '任务结束自动作废', 'sys:engine')
+    }
+
     logger.info('触发事件...任务完成', name, run.id, task.id)
     dumpOutputParameters(task)
     logger.info('触发事件...输出参数就位', name, run.id, task.id)
     if (task.name !== 'initial') {
-        task.endEventId = logKeyChange(run, { type: 'task', message: `待办任务${task.title}已完成：${name}` })
+        task.endEventId = logKeyChange(run, { type: 'task', message: `待办任务${ task.title }已完成：${ name }` })
         await webhooks.taskCompleted({ run, task, event: name, emitter, emitterRule })
     }
 
@@ -214,7 +220,7 @@ export const emitRunEvent = async (run, task, name, emitter, emitterRule) => {
 
 }
 const getOutputParameters = parameters =>
-    Object.fromEntries(Object.entries(parameters).filter(([name]) => !name.startsWith('TMP_')))
+    Object.fromEntries(Object.entries(parameters).filter(([ name ]) => !name.startsWith('TMP_')))
 
 const dumpOutputParameters = (parametersOwner) => {
     logger.info('提取输出参数...')
@@ -269,7 +275,7 @@ export const respondRun = async (run, task, request, action, payload, operator) 
 
     request.responses ??= []
     request.responses.push({ id: generateObjectID(), action, payload, kind })
-    logKeyChange(run, { type: 'request', message: `${operator}${actionTitle}了待办事项 ${task.title}` })
+    logKeyChange(run, { type: 'request', message: `${ operator }${ actionTitle }了待办事项 ${ task.title }` })
     await respondStrategies[kind](operator, run, task, request, action, payload,)
 }
 

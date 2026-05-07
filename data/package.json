@@ -1,0 +1,12 @@
+{
+  "name": "es-workflow-data",
+  "version": "1.0.0",
+  "main": "src/index.js",
+  "author": "Chun Li",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "koa-es-template": "^1.0.51"
+  }
+}
