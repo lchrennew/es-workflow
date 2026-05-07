@@ -1,0 +1,7 @@
+kind: listener
+name: engine-request-sent-listener
+metadata:
+  title: Engine request.sent 监听器
+spec:
+  triggers:
+    - engine-request-sent-trigger

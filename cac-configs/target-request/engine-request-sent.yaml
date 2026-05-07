@@ -1,0 +1,18 @@
+kind: target-request
+name: engine-request-sent
+metadata:
+  title: Engine request.sent 目标请求
+spec:
+  props:
+    trigger: engine-request-sent-trigger
+    binding: engine-webhook-binding
+    template: engine-request-sent-template
+    targetSystem: engine-webhook-api
+  errorTracking:
+    enabled: true
+    eventName: engine-webhook-forward-failed
+  postResponseScript: |
+    console.log('request.sent webhook forwarded:', response?.status);
+    if (!response?.ok) {
+      console.error('Forward failed:', response?.statusText);
+    }

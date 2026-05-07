@@ -1,0 +1,7 @@
+kind: listener
+name: engine-response-received-listener
+metadata:
+  title: Engine response.received 监听器
+spec:
+  triggers:
+    - engine-response-received-trigger

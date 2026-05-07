@@ -1,0 +1,22 @@
+kind: template
+name: engine-request-sent-template
+metadata:
+  title: Engine request.sent 事件模板
+spec:
+  path: /request-sent
+  method: POST
+  format: json
+  headers:
+    Content-Type: application/json
+    X-Webhook-Event: request.sent
+    X-Run-ID: $RUN_ID$
+    X-Request-ID: $REQUEST_ID$
+  body:
+    eventType: request.sent
+    runId: $RUN_ID$
+    requestId: $REQUEST_ID$
+    workflowId: $WORKFLOW_ID$
+    timestamp: $(Number)TIMESTAMP$
+    run: $...RUN$
+    request: $...REQUEST$
+    emitter: $...EMITTER$

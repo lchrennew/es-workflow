@@ -1,0 +1,20 @@
+kind: template
+name: engine-run-started-template
+metadata:
+  title: Engine run.started 事件模板
+spec:
+  path: /run-started
+  method: POST
+  format: json
+  headers:
+    Content-Type: application/json
+    X-Webhook-Event: run.started
+    X-Run-ID: $RUN_ID$
+  body:
+    eventType: run.started
+    runId: $RUN_ID$
+    workflowId: $WORKFLOW_ID$
+    workflowName: $WORKFLOW_NAME$
+    status: $RUN_STATUS$
+    timestamp: $(Number)TIMESTAMP$
+    run: $...RUN$

@@ -1,0 +1,9 @@
+kind: target-system
+name: engine-webhook-api
+metadata:
+  title: Engine Webhook API 服务
+spec:
+  default: http://localhost:3000/api/engine/webhooks
+  development: http://localhost:3000/api/engine/webhooks
+  staging: https://api-staging.example.com/api/engine/webhooks
+  production: https://api.example.com/api/engine/webhooks

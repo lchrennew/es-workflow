@@ -1,8 +1,7 @@
 {
   "api": {
-    "static": "http://pippy:8084",
-    "triggers": "http://pippy:8088",
-    "trigger-ui": "http://pippy:8084/triggers"
+    "cac": "http://localhost:4242",
+    "triggers": "http://localhost:4243"
   },
   "primaryColor": "#8b36b1"
 }

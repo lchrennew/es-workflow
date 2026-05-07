@@ -1,0 +1,7 @@
+kind: listener
+name: engine-task-updated-listener
+metadata:
+  title: Engine task.updated 监听器
+spec:
+  triggers:
+    - engine-task-updated-trigger

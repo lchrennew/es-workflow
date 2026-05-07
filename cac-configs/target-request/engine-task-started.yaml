@@ -1,0 +1,18 @@
+kind: target-request
+name: engine-task-started
+metadata:
+  title: Engine task.started 目标请求
+spec:
+  props:
+    trigger: engine-task-started-trigger
+    binding: engine-webhook-binding
+    template: engine-task-started-template
+    targetSystem: engine-webhook-api
+  errorTracking:
+    enabled: true
+    eventName: engine-webhook-forward-failed
+  postResponseScript: |
+    console.log('task.started webhook forwarded:', response?.status);
+    if (!response?.ok) {
+      console.error('Forward failed:', response?.statusText);
+    }

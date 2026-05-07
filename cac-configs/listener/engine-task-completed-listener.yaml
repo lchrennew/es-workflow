@@ -1,0 +1,7 @@
+kind: listener
+name: engine-task-completed-listener
+metadata:
+  title: Engine task.completed 监听器
+spec:
+  triggers:
+    - engine-task-completed-trigger

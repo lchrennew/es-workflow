@@ -1,0 +1,21 @@
+kind: template
+name: engine-task-started-template
+metadata:
+  title: Engine task.started 事件模板
+spec:
+  path: /task-started
+  method: POST
+  format: json
+  headers:
+    Content-Type: application/json
+    X-Webhook-Event: task.started
+    X-Run-ID: $RUN_ID$
+    X-Task-ID: $TASK_ID$
+  body:
+    eventType: task.started
+    runId: $RUN_ID$
+    taskId: $TASK_ID$
+    workflowId: $WORKFLOW_ID$
+    timestamp: $(Number)TIMESTAMP$
+    run: $...RUN$
+    emitter: $...EMITTER$

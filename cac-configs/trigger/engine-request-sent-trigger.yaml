@@ -1,0 +1,10 @@
+kind: trigger
+name: engine-request-sent-trigger
+metadata:
+  title: Engine request.sent 触发器
+spec:
+  sourceInterceptor: engine-webhook-filter
+  targetInterceptor: never-intercept
+  binding: engine-webhook-binding
+  template: engine-request-sent-template
+  targetSystem: engine-webhook-api

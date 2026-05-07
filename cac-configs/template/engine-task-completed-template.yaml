@@ -1,0 +1,23 @@
+kind: template
+name: engine-task-completed-template
+metadata:
+  title: Engine task.completed 事件模板
+spec:
+  path: /task-completed
+  method: POST
+  format: json
+  headers:
+    Content-Type: application/json
+    X-Webhook-Event: task.completed
+    X-Run-ID: $RUN_ID$
+    X-Task-ID: $TASK_ID$
+  body:
+    eventType: task.completed
+    runId: $RUN_ID$
+    taskId: $TASK_ID$
+    workflowId: $WORKFLOW_ID$
+    timestamp: $(Number)TIMESTAMP$
+    run: $...RUN$
+    event: $...EVENT$
+    emitter: $...EMITTER$
+    emitterRule: $...EMITTER_RULE$

@@ -1,0 +1,32 @@
+kind: source-interceptor
+name: engine-webhook-filter
+metadata:
+  title: Engine Webhook 过滤器
+spec:
+  script: |
+    if (method !== 'POST') {
+      console.log('Only POST requests allowed');
+      return true;
+    }
+    
+    if (!headers['x-webhook-event']) {
+      console.log('Missing webhook event header');
+      return true;
+    }
+    
+    const allowedEvents = [
+      'run.started',
+      'run.completed',
+      'task.started',
+      'task.completed',
+      'request.sent',
+      'response.received',
+      'task.updated'
+    ];
+    
+    if (!allowedEvents.includes(headers['x-webhook-event'])) {
+      console.log(`Event ${headers['x-webhook-event']} not allowed`);
+      return true;
+    }
+    
+    return false;

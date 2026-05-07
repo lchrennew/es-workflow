@@ -1,0 +1,7 @@
+kind: listener
+name: engine-run-completed-listener
+metadata:
+  title: Engine run.completed 监听器
+spec:
+  triggers:
+    - engine-run-completed-trigger

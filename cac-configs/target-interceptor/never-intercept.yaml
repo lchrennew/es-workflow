@@ -1,0 +1,7 @@
+kind: target-interceptor
+name: never-intercept
+metadata:
+  title: 从不拦截
+spec:
+  script: |
+    return false;

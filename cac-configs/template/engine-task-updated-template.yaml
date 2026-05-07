@@ -1,0 +1,22 @@
+kind: template
+name: engine-task-updated-template
+metadata:
+  title: Engine task.updated 事件模板
+spec:
+  path: /task-updated
+  method: POST
+  format: json
+  headers:
+    Content-Type: application/json
+    X-Webhook-Event: task.updated
+    X-Run-ID: $RUN_ID$
+    X-Task-ID: $TASK_ID$
+  body:
+    eventType: task.updated
+    runId: $RUN_ID$
+    taskId: $TASK_ID$
+    taskStatus: $TASK_STATUS$
+    workflowId: $WORKFLOW_ID$
+    timestamp: $(Number)TIMESTAMP$
+    run: $...RUN$
+    task: $...TASK$

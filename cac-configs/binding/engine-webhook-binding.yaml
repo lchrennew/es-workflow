@@ -1,0 +1,25 @@
+kind: binding
+name: engine-webhook-binding
+metadata:
+  title: Engine Webhook 数据绑定
+spec:
+  script: |
+    variables.EVENT_TYPE = headers['x-webhook-event'] || 'unknown';
+    variables.RUN_ID = body.run?.id || body.runId || '';
+    variables.TASK_ID = body.taskId || '';
+    variables.REQUEST_ID = body.requestId || body.request?.id || '';
+    variables.WORKFLOW_ID = body.run?.workflowId || '';
+    variables.WORKFLOW_NAME = body.run?.workflowName || '';
+    variables.RUN_STATUS = body.run?.status || '';
+    variables.TASK_STATUS = body.task?.status || '';
+    variables.TIMESTAMP = dayjs().unix();
+    
+    variables.RUN = JSON.stringify(body.run || {});
+    variables.TASK = JSON.stringify(body.task || {});
+    variables.REQUEST = JSON.stringify(body.request || {});
+    variables.EMITTER = JSON.stringify(body.emitter || {});
+    variables.EMITTER_RULE = JSON.stringify(body.emitterRule || {});
+    variables.EVENT = JSON.stringify(body.event || {});
+    variables.PAYLOAD = JSON.stringify(body.payload || {});
+    
+    variables['@'] = query.env || 'production';

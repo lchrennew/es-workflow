@@ -36,8 +36,3 @@ export const useTimeout = (msecs = 60000) => async (ctx, next) => {
     const timeoutAbort = abortable(controller)
     return await timeoutAbort(ctx, next);
 }
-
-export const getTriggersApi = () => window.appSettings?.api.triggers ?? import.meta.env.VITE_APP_TRIGGERS_API
-
-export const invokeTriggerApi = (path, ...args) => invokeApi(`${ getTriggersApi() }/${ path }`, ...args)
-export const getTriggerData = (path, ...args) => getData(`${ getTriggersApi() }/${ path }`, ...args)

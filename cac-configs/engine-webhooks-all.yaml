@@ -1,0 +1,532 @@
+---
+kind: target-system
+name: engine-webhook-api
+metadata:
+  title: Engine Webhook API 服务
+spec:
+  default: http://localhost:3000/api/engine/webhooks
+  development: http://localhost:3000/api/engine/webhooks
+  staging: https://api-staging.example.com/api/engine/webhooks
+  production: https://api.example.com/api/engine/webhooks
+
+---
+kind: binding
+name: engine-webhook-binding
+metadata:
+  title: Engine Webhook 数据绑定
+spec:
+  script: |
+    variables.EVENT_TYPE = headers['x-webhook-event'] || 'unknown';
+    variables.RUN_ID = body.run?.id || body.runId || '';
+    variables.TASK_ID = body.taskId || '';
+    variables.REQUEST_ID = body.requestId || body.request?.id || '';
+    variables.WORKFLOW_ID = body.run?.workflowId || '';
+    variables.WORKFLOW_NAME = body.run?.workflowName || '';
+    variables.RUN_STATUS = body.run?.status || '';
+    variables.TASK_STATUS = body.task?.status || '';
+    variables.TIMESTAMP = dayjs().unix();
+    
+    variables.RUN = JSON.stringify(body.run || {});
+    variables.TASK = JSON.stringify(body.task || {});
+    variables.REQUEST = JSON.stringify(body.request || {});
+    variables.EMITTER = JSON.stringify(body.emitter || {});
+    variables.EMITTER_RULE = JSON.stringify(body.emitterRule || {});
+    variables.EVENT = JSON.stringify(body.event || {});
+    variables.PAYLOAD = JSON.stringify(body.payload || {});
+    
+    variables['@'] = query.env || 'production';
+
+---
+kind: source-interceptor
+name: engine-webhook-filter
+metadata:
+  title: Engine Webhook 过滤器
+spec:
+  script: |
+    if (method !== 'POST') {
+      console.log('Only POST requests allowed');
+      return true;
+    }
+    
+    if (!headers['x-webhook-event']) {
+      console.log('Missing webhook event header');
+      return true;
+    }
+    
+    const allowedEvents = [
+      'run.started',
+      'run.completed',
+      'task.started',
+      'task.completed',
+      'request.sent',
+      'response.received',
+      'task.updated'
+    ];
+    
+    if (!allowedEvents.includes(headers['x-webhook-event'])) {
+      console.log(`Event ${headers['x-webhook-event']} not allowed`);
+      return true;
+    }
+    
+    return false;
+
+---
+kind: target-interceptor
+name: never-intercept
+metadata:
+  title: 从不拦截
+spec:
+  script: |
+    return false;
+
+---
+kind: template
+name: engine-run-started-template
+metadata:
+  title: Engine run.started 事件模板
+spec:
+  path: /run-started
+  method: POST
+  format: json
+  headers:
+    Content-Type: application/json
+    X-Webhook-Event: run.started
+    X-Run-ID: $RUN_ID$
+  body:
+    eventType: run.started
+    runId: $RUN_ID$
+    workflowId: $WORKFLOW_ID$
+    workflowName: $WORKFLOW_NAME$
+    status: $RUN_STATUS$
+    timestamp: $(Number)TIMESTAMP$
+    run: $...RUN$
+
+---
+kind: template
+name: engine-run-completed-template
+metadata:
+  title: Engine run.completed 事件模板
+spec:
+  path: /run-completed
+  method: POST
+  format: json
+  headers:
+    Content-Type: application/json
+    X-Webhook-Event: run.completed
+    X-Run-ID: $RUN_ID$
+  body:
+    eventType: run.completed
+    runId: $RUN_ID$
+    workflowId: $WORKFLOW_ID$
+    workflowName: $WORKFLOW_NAME$
+    status: $RUN_STATUS$
+    timestamp: $(Number)TIMESTAMP$
+    run: $...RUN$
+
+---
+kind: template
+name: engine-task-started-template
+metadata:
+  title: Engine task.started 事件模板
+spec:
+  path: /task-started
+  method: POST
+  format: json
+  headers:
+    Content-Type: application/json
+    X-Webhook-Event: task.started
+    X-Run-ID: $RUN_ID$
+    X-Task-ID: $TASK_ID$
+  body:
+    eventType: task.started
+    runId: $RUN_ID$
+    taskId: $TASK_ID$
+    workflowId: $WORKFLOW_ID$
+    timestamp: $(Number)TIMESTAMP$
+    run: $...RUN$
+    emitter: $...EMITTER$
+
+---
+kind: template
+name: engine-task-completed-template
+metadata:
+  title: Engine task.completed 事件模板
+spec:
+  path: /task-completed
+  method: POST
+  format: json
+  headers:
+    Content-Type: application/json
+    X-Webhook-Event: task.completed
+    X-Run-ID: $RUN_ID$
+    X-Task-ID: $TASK_ID$
+  body:
+    eventType: task.completed
+    runId: $RUN_ID$
+    taskId: $TASK_ID$
+    workflowId: $WORKFLOW_ID$
+    timestamp: $(Number)TIMESTAMP$
+    run: $...RUN$
+    event: $...EVENT$
+    emitter: $...EMITTER$
+    emitterRule: $...EMITTER_RULE$
+
+---
+kind: template
+name: engine-request-sent-template
+metadata:
+  title: Engine request.sent 事件模板
+spec:
+  path: /request-sent
+  method: POST
+  format: json
+  headers:
+    Content-Type: application/json
+    X-Webhook-Event: request.sent
+    X-Run-ID: $RUN_ID$
+    X-Request-ID: $REQUEST_ID$
+  body:
+    eventType: request.sent
+    runId: $RUN_ID$
+    requestId: $REQUEST_ID$
+    workflowId: $WORKFLOW_ID$
+    timestamp: $(Number)TIMESTAMP$
+    run: $...RUN$
+    request: $...REQUEST$
+    emitter: $...EMITTER$
+
+---
+kind: template
+name: engine-response-received-template
+metadata:
+  title: Engine response.received 事件模板
+spec:
+  path: /response-received
+  method: POST
+  format: json
+  headers:
+    Content-Type: application/json
+    X-Webhook-Event: response.received
+    X-Run-ID: $RUN_ID$
+    X-Task-ID: $TASK_ID$
+    X-Request-ID: $REQUEST_ID$
+  body:
+    eventType: response.received
+    runId: $RUN_ID$
+    taskId: $TASK_ID$
+    requestId: $REQUEST_ID$
+    workflowId: $WORKFLOW_ID$
+    timestamp: $(Number)TIMESTAMP$
+    run: $...RUN$
+    payload: $...PAYLOAD$
+
+---
+kind: template
+name: engine-task-updated-template
+metadata:
+  title: Engine task.updated 事件模板
+spec:
+  path: /task-updated
+  method: POST
+  format: json
+  headers:
+    Content-Type: application/json
+    X-Webhook-Event: task.updated
+    X-Run-ID: $RUN_ID$
+    X-Task-ID: $TASK_ID$
+  body:
+    eventType: task.updated
+    runId: $RUN_ID$
+    taskId: $TASK_ID$
+    taskStatus: $TASK_STATUS$
+    workflowId: $WORKFLOW_ID$
+    timestamp: $(Number)TIMESTAMP$
+    run: $...RUN$
+    task: $...TASK$
+
+---
+kind: trigger
+name: engine-run-started-trigger
+metadata:
+  title: Engine run.started 触发器
+spec:
+  sourceInterceptor: engine-webhook-filter
+  targetInterceptor: never-intercept
+  binding: engine-webhook-binding
+  template: engine-run-started-template
+  targetSystem: engine-webhook-api
+
+---
+kind: trigger
+name: engine-run-completed-trigger
+metadata:
+  title: Engine run.completed 触发器
+spec:
+  sourceInterceptor: engine-webhook-filter
+  targetInterceptor: never-intercept
+  binding: engine-webhook-binding
+  template: engine-run-completed-template
+  targetSystem: engine-webhook-api
+
+---
+kind: trigger
+name: engine-task-started-trigger
+metadata:
+  title: Engine task.started 触发器
+spec:
+  sourceInterceptor: engine-webhook-filter
+  targetInterceptor: never-intercept
+  binding: engine-webhook-binding
+  template: engine-task-started-template
+  targetSystem: engine-webhook-api
+
+---
+kind: trigger
+name: engine-task-completed-trigger
+metadata:
+  title: Engine task.completed 触发器
+spec:
+  sourceInterceptor: engine-webhook-filter
+  targetInterceptor: never-intercept
+  binding: engine-webhook-binding
+  template: engine-task-completed-template
+  targetSystem: engine-webhook-api
+
+---
+kind: trigger
+name: engine-request-sent-trigger
+metadata:
+  title: Engine request.sent 触发器
+spec:
+  sourceInterceptor: engine-webhook-filter
+  targetInterceptor: never-intercept
+  binding: engine-webhook-binding
+  template: engine-request-sent-template
+  targetSystem: engine-webhook-api
+
+---
+kind: trigger
+name: engine-response-received-trigger
+metadata:
+  title: Engine response.received 触发器
+spec:
+  sourceInterceptor: engine-webhook-filter
+  targetInterceptor: never-intercept
+  binding: engine-webhook-binding
+  template: engine-response-received-template
+  targetSystem: engine-webhook-api
+
+---
+kind: trigger
+name: engine-task-updated-trigger
+metadata:
+  title: Engine task.updated 触发器
+spec:
+  sourceInterceptor: engine-webhook-filter
+  targetInterceptor: never-intercept
+  binding: engine-webhook-binding
+  template: engine-task-updated-template
+  targetSystem: engine-webhook-api
+
+---
+kind: target-request
+name: engine-run-started
+metadata:
+  title: Engine run.started 目标请求
+spec:
+  props:
+    trigger: engine-run-started-trigger
+    binding: engine-webhook-binding
+    template: engine-run-started-template
+    targetSystem: engine-webhook-api
+  errorTracking:
+    enabled: true
+    eventName: engine-webhook-forward-failed
+  postResponseScript: |
+    console.log('run.started webhook forwarded:', response?.status);
+    if (!response?.ok) {
+      console.error('Forward failed:', response?.statusText);
+    }
+
+---
+kind: target-request
+name: engine-run-completed
+metadata:
+  title: Engine run.completed 目标请求
+spec:
+  props:
+    trigger: engine-run-completed-trigger
+    binding: engine-webhook-binding
+    template: engine-run-completed-template
+    targetSystem: engine-webhook-api
+  errorTracking:
+    enabled: true
+    eventName: engine-webhook-forward-failed
+  postResponseScript: |
+    console.log('run.completed webhook forwarded:', response?.status);
+    if (!response?.ok) {
+      console.error('Forward failed:', response?.statusText);
+    }
+
+---
+kind: target-request
+name: engine-task-started
+metadata:
+  title: Engine task.started 目标请求
+spec:
+  props:
+    trigger: engine-task-started-trigger
+    binding: engine-webhook-binding
+    template: engine-task-started-template
+    targetSystem: engine-webhook-api
+  errorTracking:
+    enabled: true
+    eventName: engine-webhook-forward-failed
+  postResponseScript: |
+    console.log('task.started webhook forwarded:', response?.status);
+    if (!response?.ok) {
+      console.error('Forward failed:', response?.statusText);
+    }
+
+---
+kind: target-request
+name: engine-task-completed
+metadata:
+  title: Engine task.completed 目标请求
+spec:
+  props:
+    trigger: engine-task-completed-trigger
+    binding: engine-webhook-binding
+    template: engine-task-completed-template
+    targetSystem: engine-webhook-api
+  errorTracking:
+    enabled: true
+    eventName: engine-webhook-forward-failed
+  postResponseScript: |
+    console.log('task.completed webhook forwarded:', response?.status);
+    if (!response?.ok) {
+      console.error('Forward failed:', response?.statusText);
+    }
+
+---
+kind: target-request
+name: engine-request-sent
+metadata:
+  title: Engine request.sent 目标请求
+spec:
+  props:
+    trigger: engine-request-sent-trigger
+    binding: engine-webhook-binding
+    template: engine-request-sent-template
+    targetSystem: engine-webhook-api
+  errorTracking:
+    enabled: true
+    eventName: engine-webhook-forward-failed
+  postResponseScript: |
+    console.log('request.sent webhook forwarded:', response?.status);
+    if (!response?.ok) {
+      console.error('Forward failed:', response?.statusText);
+    }
+
+---
+kind: target-request
+name: engine-response-received
+metadata:
+  title: Engine response.received 目标请求
+spec:
+  props:
+    trigger: engine-response-received-trigger
+    binding: engine-webhook-binding
+    template: engine-response-received-template
+    targetSystem: engine-webhook-api
+  errorTracking:
+    enabled: true
+    eventName: engine-webhook-forward-failed
+  postResponseScript: |
+    console.log('response.received webhook forwarded:', response?.status);
+    if (!response?.ok) {
+      console.error('Forward failed:', response?.statusText);
+    }
+
+---
+kind: target-request
+name: engine-task-updated
+metadata:
+  title: Engine task.updated 目标请求
+spec:
+  props:
+    trigger: engine-task-updated-trigger
+    binding: engine-webhook-binding
+    template: engine-task-updated-template
+    targetSystem: engine-webhook-api
+  errorTracking:
+    enabled: true
+    eventName: engine-webhook-forward-failed
+  postResponseScript: |
+    console.log('task.updated webhook forwarded:', response?.status);
+    if (!response?.ok) {
+      console.error('Forward failed:', response?.statusText);
+    }
+
+---
+kind: listener
+name: engine-run-started-listener
+metadata:
+  title: Engine run.started 监听器
+spec:
+  triggers:
+    - engine-run-started-trigger
+
+---
+kind: listener
+name: engine-run-completed-listener
+metadata:
+  title: Engine run.completed 监听器
+spec:
+  triggers:
+    - engine-run-completed-trigger
+
+---
+kind: listener
+name: engine-task-started-listener
+metadata:
+  title: Engine task.started 监听器
+spec:
+  triggers:
+    - engine-task-started-trigger
+
+---
+kind: listener
+name: engine-task-completed-listener
+metadata:
+  title: Engine task.completed 监听器
+spec:
+  triggers:
+    - engine-task-completed-trigger
+
+---
+kind: listener
+name: engine-request-sent-listener
+metadata:
+  title: Engine request.sent 监听器
+spec:
+  triggers:
+    - engine-request-sent-trigger
+
+---
+kind: listener
+name: engine-response-received-listener
+metadata:
+  title: Engine response.received 监听器
+spec:
+  triggers:
+    - engine-response-received-trigger
+
+---
+kind: listener
+name: engine-task-updated-listener
+metadata:
+  title: Engine task.updated 监听器
+spec:
+  triggers:
+    - engine-task-updated-trigger

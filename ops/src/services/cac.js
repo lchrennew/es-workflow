@@ -1,10 +1,13 @@
 import { getData, invokeApi } from "../utils/api.js";
-import { DELETE, PUT } from "es-fetch-api/middlewares/methods.js";
+import { DELETE, POST } from "es-fetch-api/middlewares/methods.js";
 import { json } from "es-fetch-api/middlewares/body.js";
 import { query } from "es-fetch-api/middlewares/query.js";
 import * as YAML from 'yaml'
 
-export const saveConfigs = yaml => invokeApi('/cac/submit', PUT, json(YAML.parseAllDocuments(yaml)))
-export const removeConfig = (kind, name) => invokeApi('/cac', DELETE, query({ kind, name }))
-export const loadConfig = (kind, name) => getData('/cac/info', query({ kind, name }))
-export const loadConfigs = ({ kind, prefix = '' }) => getData('/cac/', query({ kind, prefix }))
+const getBase = () => `${ window.appSettings?.api.cac ?? import.meta.env.VITE_CAC_API }`
+
+export const saveConfigs = yaml =>
+    invokeApi(`${ getBase() }/configs/submit`, POST, json({ saved: YAML.parseAllDocuments(yaml), deleted: [] }))
+export const removeConfig = (kind, name) => invokeApi(`${ getBase() }/configs`, DELETE, query({ kind, name }))
+export const loadConfig = (kind, name) => getData(`${ getBase() }/configs/info`, query({ kind, name }))
+export const loadConfigs = ({ kind, prefix = '' }) => getData(`${ getBase() }/configs/`, query({ kind, prefix }))
