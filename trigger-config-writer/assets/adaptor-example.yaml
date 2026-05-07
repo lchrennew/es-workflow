@@ -1,0 +1,328 @@
+# Adaptor 完整配置示例
+
+这是一个用户仪表盘数据聚合的完整示例,展示了如何使用 Adaptor 从多个微服务聚合数据并返回给前端。
+
+## 场景说明
+
+前端需要展示用户仪表盘,包含:
+- 用户基本信息 (来自用户服务)
+- 最近订单列表 (来自订单服务)
+- 未读通知数量 (来自通知服务)
+
+使用 Adaptor 可以在一次请求中聚合所有数据,减少前端请求次数。
+
+## 访问方式
+
+```
+GET /adapt/user-dashboard?userId=12345
+Authorization: Bearer <token>
+```
+
+## 配置文件
+
+### 1. TargetSystem - 定义各个微服务地址
+
+```yaml
+---
+kind: target-system
+name: user-service
+metadata:
+  title: 用户服务
+spec:
+  default: https://user-api.example.com
+  production: https://user-api.prod.example.com
+  staging: https://user-api.staging.example.com
+
+---
+kind: target-system
+name: order-service
+metadata:
+  title: 订单服务
+spec:
+  default: https://order-api.example.com
+  production: https://order-api.prod.example.com
+
+---
+kind: target-system
+name: notification-service
+metadata:
+  title: 通知服务
+spec:
+  default: https://notification-api.example.com
+  production: https://notification-api.prod.example.com
+```
+
+### 2. Binding - 提取请求参数
+
+```yaml
+---
+kind: binding
+name: extract-user-params
+metadata:
+  title: 提取用户参数
+spec:
+  script: |
+    variables.USER_ID = query.userId || body.userId;
+    variables.TOKEN = headers.authorization?.replace('Bearer ', '');
+    variables.LIMIT = String(query.limit || 10);
+```
+
+### 3. Template - 定义各个请求格式
+
+```yaml
+---
+kind: template
+name: user-profile-template
+metadata:
+  title: 用户资料请求模板
+spec:
+  path: /api/v1/users/$USER_ID$
+  method: GET
+  headers:
+    Authorization: Bearer $TOKEN$
+
+---
+kind: template
+name: user-orders-template
+metadata:
+  title: 用户订单请求模板
+spec:
+  path: /api/v1/orders
+  method: GET
+  headers:
+    Authorization: Bearer $TOKEN$
+  query:
+    userId: $USER_ID$
+    limit: $LIMIT$
+    status: active
+
+---
+kind: template
+name: user-notifications-template
+metadata:
+  title: 用户通知请求模板
+spec:
+  path: /api/v1/notifications/unread-count
+  method: GET
+  headers:
+    Authorization: Bearer $TOKEN$
+  query:
+    userId: $USER_ID$
+```
+
+### 4. SourceInterceptor - 验证请求
+
+```yaml
+---
+kind: source-interceptor
+name: auth-check
+metadata:
+  title: 权限验证
+spec:
+  script: |
+    if (!headers.authorization) {
+      console.log('Missing authorization header');
+      return true;
+    }
+    
+    if (!query.userId && !body.userId) {
+      console.log('Missing userId parameter');
+      return true;
+    }
+    
+    return false;
+```
+
+### 5. AdaptorRequest - 定义各个数据请求
+
+```yaml
+---
+kind: adaptor-request
+name: user-profile
+metadata:
+  title: 获取用户资料
+spec:
+  binding: extract-user-params
+  template: user-profile-template
+  targetSystem: user-service
+
+---
+kind: adaptor-request
+name: user-orders
+metadata:
+  title: 获取用户订单
+spec:
+  binding: extract-user-params
+  template: user-orders-template
+  targetSystem: order-service
+
+---
+kind: adaptor-request
+name: user-notifications
+metadata:
+  title: 获取未读通知数
+spec:
+  binding: extract-user-params
+  template: user-notifications-template
+  targetSystem: notification-service
+```
+
+### 6. Adaptor - 聚合数据并返回
+
+```yaml
+---
+kind: adaptor
+name: user-dashboard
+metadata:
+  title: 用户仪表盘数据聚合
+spec:
+  sourceInterceptor: auth-check
+  adaptorRequests:
+    - user-profile
+    - user-orders
+    - user-notifications
+  transformResponse: |
+    const profile = responses['user-profile']?.data;
+    const orders = responses['user-orders']?.items || [];
+    const notifications = responses['user-notifications']?.data;
+    
+    if (!profile) {
+      result.error = 'Failed to fetch user profile';
+      return;
+    }
+    
+    result.dashboard = {
+      user: {
+        id: profile.id,
+        name: profile.name,
+        email: profile.email,
+        avatar: profile.avatar,
+        memberLevel: profile.memberLevel
+      },
+      stats: {
+        totalOrders: orders.length,
+        unreadNotifications: notifications?.count || 0,
+        lastLoginTime: profile.lastLoginTime
+      },
+      recentOrders: orders.slice(0, 5).map(order => ({
+        id: order.id,
+        title: order.title,
+        amount: order.amount,
+        status: order.status,
+        createdAt: order.createdAt
+      })),
+      timestamp: Date.now()
+    };
+  outputCache:
+    enabled: true
+    keyGetter: |
+      return `dashboard:${query.userId}`;
+    expirationSeconds: 60
+  passive: false
+```
+
+## 响应示例
+
+```json
+{
+  "dashboard": {
+    "user": {
+      "id": "12345",
+      "name": "张三",
+      "email": "zhangsan@example.com",
+      "avatar": "https://avatar.example.com/12345.jpg",
+      "memberLevel": "premium"
+    },
+    "stats": {
+      "totalOrders": 15,
+      "unreadNotifications": 3,
+      "lastLoginTime": "2026-05-06T10:30:00Z"
+    },
+    "recentOrders": [
+      {
+        "id": "ORD-001",
+        "title": "商品A",
+        "amount": 99.99,
+        "status": "active",
+        "createdAt": "2026-05-05T15:20:00Z"
+      },
+      {
+        "id": "ORD-002",
+        "title": "商品B",
+        "amount": 199.99,
+        "status": "active",
+        "createdAt": "2026-05-04T09:10:00Z"
+      }
+    ],
+    "timestamp": 1746523800000
+  }
+}
+```
+
+## 被动模式示例
+
+如果需要根据用户等级按需加载不同数据,可以使用被动模式:
+
+```yaml
+kind: adaptor
+name: user-dashboard-passive
+metadata:
+  title: 用户仪表盘数据聚合(被动模式)
+spec:
+  sourceInterceptor: auth-check
+  adaptorRequests:
+    - user-profile
+    - user-orders
+    - premium-benefits
+  transformResponse: |
+    const profile = await requests['user-profile'].response;
+    
+    if (!profile?.data) {
+      result.error = 'Failed to fetch user profile';
+      return;
+    }
+    
+    result.user = profile.data;
+    
+    const orders = await requests['user-orders'].response;
+    result.recentOrders = orders?.items?.slice(0, 5) || [];
+    
+    if (profile.data.memberLevel === 'premium') {
+      const benefits = await requests['premium-benefits'].response;
+      result.premiumBenefits = benefits?.data;
+    }
+    
+    result.timestamp = Date.now();
+  outputCache:
+    enabled: true
+    keyGetter: |
+      return `dashboard:${query.userId}:${method}`;
+    expirationSeconds: 60
+  passive: true
+```
+
+## 使用场景
+
+1. **BFF 层**: 作为前端的后端聚合层
+2. **API 网关**: 聚合多个微服务的数据
+3. **数据转换**: 将后端数据格式转换为前端需要的格式
+4. **性能优化**: 减少前端请求次数,提升加载速度
+5. **缓存层**: 为慢速 API 添加缓存,提升响应速度
+
+## 与 Trigger 的对比
+
+| 特性 | Trigger | Adaptor |
+|------|---------|---------|
+| 路由 | `/hook/:name` | `/adapt/:name` |
+| 返回值 | `{ok, eventID}` | 自定义数据结构 |
+| 用途 | 请求转发 | 数据聚合 |
+| 缓存 | 不支持 | 支持输出缓存 |
+| 被动模式 | 不支持 | 支持按需加载 |
+
+## 注意事项
+
+1. **错误处理**: transformResponse 中需要检查响应是否存在
+2. **缓存策略**: 根据数据更新频率设置合理的缓存时间
+3. **性能考虑**: 被动模式适合条件加载,非被动模式适合并行请求
+4. **权限验证**: 使用 sourceInterceptor 进行统一的权限验证
+5. **数据脱敏**: 在 transformResponse 中过滤敏感信息

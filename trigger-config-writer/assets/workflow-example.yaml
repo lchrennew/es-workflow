@@ -1,0 +1,131 @@
+# 完整的 Webhook 转发配置示例
+
+# 这是一个完整的 GitHub webhook 转发到内部 API 的配置示例
+# 展示了如何配置一个完整的转发流程
+
+---
+# 1. Target System - 定义目标 API 地址
+kind: target-system
+name: internal-api
+metadata:
+  title: 内部 API 系统
+spec:
+  default: https://api.internal.example.com
+  production: https://api.prod.internal.example.com
+  staging: https://api.staging.internal.example.com
+
+---
+# 2. Template - 定义输出请求格式
+kind: template
+name: webhook-forward-template
+metadata:
+  title: Webhook 转发模板
+spec:
+  path: /api/webhooks/github
+  method: POST
+  format: json
+  headers:
+    Content-Type: application/json
+    X-Source: github
+    X-Event-Type: $EVENT_TYPE$
+  body:
+    repository: $REPO_NAME$
+    owner: $REPO_OWNER$
+    action: $ACTION$
+    user: $USER$
+    timestamp: $(Number)TIMESTAMP$
+    url: $PR_URL$
+
+---
+# 3. Binding - 提取和转换数据
+kind: binding
+name: github-webhook-binding
+metadata:
+  title: GitHub Webhook 数据绑定
+spec:
+  script: |
+    variables.REPO_NAME = body.repository?.name || '';
+    variables.REPO_OWNER = body.repository?.owner?.login || '';
+    variables.PR_NUMBER = String(body.pull_request?.number || 0);
+    variables.PR_TITLE = body.pull_request?.title || '';
+    variables.PR_URL = body.pull_request?.html_url || '';
+    variables.ACTION = body.action;
+    variables.EVENT_TYPE = headers['x-github-event'] || 'unknown';
+    variables.USER = body.sender?.login || '';
+    variables.TIMESTAMP = dayjs().unix();
+    
+    variables['@'] = query.env || 'production';
+
+---
+# 4. Source Interceptor - 判断是否触发
+kind: source-interceptor
+name: github-webhook-filter
+metadata:
+  title: GitHub Webhook 过滤器
+spec:
+  script: |
+    if (method !== 'POST') {
+      console.log('Only POST requests allowed');
+      return true;
+    }
+    
+    if (!headers['x-github-event']) {
+      console.log('Missing GitHub event header');
+      return true;
+    }
+    
+    const allowedEvents = ['pull_request', 'push', 'issues'];
+    if (!allowedEvents.includes(headers['x-github-event'])) {
+      console.log(`Event ${headers['x-github-event']} not allowed`);
+      return true;
+    }
+    
+    return false;
+
+---
+# 5. Target Interceptor - 判断是否发送
+kind: target-interceptor
+name: always-send
+metadata:
+  title: 总是发送
+spec:
+  script: |
+    return false;
+
+---
+# 6. Trigger - 串联所有配置
+kind: trigger
+name: github-webhook-trigger
+metadata:
+  title: GitHub Webhook 触发器
+spec:
+  sourceInterceptor: github-webhook-filter
+  targetInterceptor: always-send
+  template: webhook-forward-template
+  binding: github-webhook-binding
+  targetSystem: internal-api
+
+---
+# 7. Target Request - 定义输出请求
+kind: target-request
+name: github-webhook-trigger
+metadata:
+  trigger: github-webhook-trigger
+spec:
+  errorTracking: true
+  postResponseScript: |
+    console.log('Response received:', content.response?.status);
+    
+    if (!content.response?.ok) {
+      console.error('Forward failed:', content.response?.statusText);
+    }
+
+---
+# 8. Listener - 定义入口
+kind: listener
+name: github-webhooks
+metadata:
+  title: GitHub Webhooks 监听器
+spec:
+  triggers:
+    - github-webhook-trigger
