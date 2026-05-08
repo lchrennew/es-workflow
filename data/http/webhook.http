@@ -62,7 +62,7 @@ Content-Type: application/json
   }
 }
 
-### Test response.received webhook
+### Test response.received webhook (decision response)
 POST http://localhost:4244/webhook/response-received
 Content-Type: application/json
 
@@ -75,30 +75,53 @@ Content-Type: application/json
   "timestamp": 1234567890,
   "run": {
     "id": "507f1f77bcf86cd799439011",
-    "workflowId": "deploy-workflow",
-    "status": "running"
+    "name": "deploy-workflow",
+    "businessId": "BIZ-2024-001",
+    "status": "running",
+    "tasks": [],
+    "events": [],
+    "inputParameters": {},
+    "livingParameters": {},
+    "outputParameters": {}
   },
-  "task": {
-    "id": "507f191e810c19729de860ea",
-    "runId": "507f1f77bcf86cd799439011",
-    "stateName": "deploy",
-    "status": "running"
+  "response": {
+    "id": "507f191e810c19729de860ec",
+    "action": "ACCEPT",
+    "kind": "decision",
+    "payload": "审批通过"
+  }
+}
+
+### Test response.received webhook (update-task response)
+POST http://localhost:4244/webhook/response-received
+Content-Type: application/json
+
+{
+  "eventType": "response.received",
+  "runId": "507f1f77bcf86cd799439011",
+  "taskId": "507f191e810c19729de860ea",
+  "requestId": "507f191e810c19729de860eb",
+  "workflowId": "deploy-workflow",
+  "timestamp": 1234567880,
+  "run": {
+    "id": "507f1f77bcf86cd799439011",
+    "name": "deploy-workflow",
+    "businessId": "BIZ-2024-001",
+    "status": "running",
+    "tasks": [],
+    "events": [],
+    "inputParameters": {},
+    "livingParameters": {},
+    "outputParameters": {}
   },
-  "request": {
-    "id": "507f191e810c19729de860eb",
-    "taskId": "507f191e810c19729de860ea",
-    "url": "https://api.example.com/deploy",
-    "method": "POST",
-    "status": "completed",
-    "response": {
-      "status": 200,
-      "headers": {
-        "content-type": "application/json"
-      },
-      "body": {
-        "success": true,
-        "deployId": "deploy-123"
-      }
+  "response": {
+    "id": "507f191e810c19729de860ed",
+    "action": "ADD_SIGN",
+    "kind": "update-task",
+    "payload": {
+      "addRequests": [
+        {"target": "user:10087"}
+      ]
     }
   }
 }

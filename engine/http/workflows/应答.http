@@ -1,8 +1,7 @@
 @host=http://localhost:10001
 
-### 应答
-POST /run/respond
-Host: {{host}}
+### 应答 - 通过（decision）
+POST {{host}}/run/respond
 Content-Type: application/json
 
 {
@@ -10,5 +9,19 @@ Content-Type: application/json
   "task": "69ed50f16992e3cae2694739",
   "request": "69ed50f16992e3a20d69473b",
   "action": "ACCEPT",
-  "payload": "不错"
+  "payload": "不错",
+  "operator": "user:10086"
+}
+
+### 应答 - 拒绝（decision）
+POST {{host}}/run/respond
+Content-Type: application/json
+
+{
+  "run": "demo.workflow.69ed50f16992e32421694735",
+  "task": "69ed50f16992e3cae2694739",
+  "request": "69ed50f16992e3a20d69473b",
+  "action": "REFUSE",
+  "payload": "不符合要求",
+  "operator": "user:10086"
 }

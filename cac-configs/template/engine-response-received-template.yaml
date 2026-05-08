@@ -20,4 +20,4 @@ spec:
     workflowId: $WORKFLOW_ID$
     timestamp: $(Number)TIMESTAMP$
     run: $...RUN$
-    payload: $...PAYLOAD$
+    response: $...RESPONSE$

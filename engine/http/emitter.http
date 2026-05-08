@@ -1,8 +1,7 @@
 @host=http://localhost:10001
 
-### 新建emitter
-POST /emitters/
-Host: {{host}}
+### 新建emitter - 审批场景
+POST {{host}}/emitters/
 Content-Type: application/x-yaml
 
 kind: workflow-transition-emitter
@@ -11,11 +10,13 @@ metadata:
   title: 审批场景 emitter
   forUserState: true
 spec:
-  allowedActions:
+  actions:
     - action: ACCEPT
       title: 通过
+      kind: decision
     - action: REFUSE
       title: 拒绝
+      kind: decision
   allowedEvents:
     - name: passed
       title: 通过
@@ -26,9 +27,8 @@ spec:
       color: "#ef4444"
       icon: "x"
 
-### 新建emitter
-POST /emitters/
-Host: {{host}}
+### 新建emitter - 开始节点
+POST {{host}}/emitters/
 Content-Type: application/x-yaml
 
 kind: workflow-transition-emitter
@@ -37,7 +37,7 @@ metadata:
   title: 开始节点 emitter
   forUserState: false
 spec:
-  allowedActions: []
+  actions: []
   allowedEvents:
     - name: start
       title: 启动

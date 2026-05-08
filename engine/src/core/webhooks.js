@@ -7,7 +7,7 @@ const logger = getLogger("webhooks");
 
 class Webhooks {
 
-    #getHookName = event => `WEBHOOK_${ event.replaceAll('.', '_').toUpperCase() }`;
+    #getHookName = event => `WEBHOOK_${event.replaceAll('.', '_').toUpperCase()}`;
 
     async #trigger(event, payload) {
         try {
@@ -37,12 +37,12 @@ class Webhooks {
         return this.#trigger('task.completed', { run, taskId, event, emitter, emitterRule })
     }
 
-    requestSent({ run, request }) {
-        return this.#trigger('request.sent', { run, request })
+    requestSent({ run, task, request }) {
+        return this.#trigger('request.sent', { run, task, request })
     }
 
-    responseReceived({ run, taskId, requestId, payload }) {
-        return this.#trigger('response.received', { run, taskId, requestId, payload })
+    responseReceived({ run, taskId, requestId, response }) {
+        return this.#trigger('response.received', { run, taskId, requestId, response })
     }
 
     taskUpdated({ run, task }) {

@@ -16,6 +16,4 @@ spec:
     workflowId: $WORKFLOW_ID$
     timestamp: $(Number)TIMESTAMP$
     run: $...RUN$
-    task: $...TASK$
-    request: $...REQUEST$
     response: $...RESPONSE$

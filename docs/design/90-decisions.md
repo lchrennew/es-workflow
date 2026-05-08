@@ -32,11 +32,12 @@
 - [ADR-029：Emitter actions 增加 kind（decision/update-task），并通过 update-task response.payload 支持增删/作废请求](./decisions/ADR-029.md)
 - [ADR-030：移除 WorkflowRequest.status（以 voidInfo + responses 推导状态）](./decisions/ADR-030.md)
 - [ADR-031：WorkflowTask 持有运行期 State 快照（name/emitter/emitterRules/transitions，不含 conditions）](./decisions/ADR-031.md)
-- [ADR-032：移除 WorkflowRun.createdAt/updatedAt 和 runNumber，id 改为 `<工作流标识>.<ObjectId>`](./decisions/ADR-032.md)
+- [ADR-032：移除 WorkflowRun.createdAt/updatedAt 和 runNumber，WorkflowRun.id 使用 ObjectId](./decisions/ADR-032.md)
 - [ADR-033：移除 WorkflowResponse.time（从 ObjectId 推导时间）](./decisions/ADR-033.md)
 - [ADR-034：移除 WorkflowTask.updatedAt（无需记录更新时间）](./decisions/ADR-034.md)
 - [ADR-035：移除 RequestSender 配置域，统一使用 Webhook 机制](./decisions/ADR-035.md)
 - [ADR-036：事件提交后自动作废未决策请求，作废请求不可应答](./decisions/ADR-036.md)
+- [ADR-037：在 WorkflowRun 上引入 businessId（外部事项标识）](./decisions/ADR-037.md)
 
 ## 历史（已废弃，仅保留用于追溯）
 

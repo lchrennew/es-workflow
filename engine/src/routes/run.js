@@ -1,5 +1,5 @@
 import { Controller } from "koa-es-template";
-import { loadRun, logKeyChange, nextTick, respondRun, saveRun } from "../core/run.js";
+import { existsRunByBusinessId, loadRun, logKeyChange, nextTick, respondRun, saveRun } from "../core/run.js";
 import { generateObjectID } from "es-object-id";
 
 export default class RunController extends Controller {
@@ -20,11 +20,17 @@ export default class RunController extends Controller {
         const { config, parameters: inputParameters } = ctx.request.body
         this.logger.info('启动工作流...已提取请求数据',);
 
-        const id = `${ config.name.replaceAll('/', '.') }.${ generateObjectID() }`
+        const businessId = inputParameters.BUSINESS_ID
+        if (!businessId) return ctx.body = { ok: false, message: '业务ID不能为空' }
+        const exists = await existsRunByBusinessId(businessId)
+        if (exists) return ctx.body = { ok: false, message: '业务ID已存在' }
+
+        const id = generateObjectID()
         this.logger.info('启动工作流...已生成运行ID',);
 
         const run = {
             id,
+            businessId,
             name: config.name,
             config,
             status: 'initialized',
@@ -45,7 +51,7 @@ export default class RunController extends Controller {
 
 
     respond = async ctx => {
-        const { run: runId, task: taskId, request: requestId, action, payload } = ctx.request.body
+        const { run: runId, task: taskId, request: requestId, action, payload, operator = 'system' } = ctx.request.body
         const run = await loadRun(runId)
         const task = run.tasks.find(task => task.id === taskId)
         if (task.status !== 'in-progress') return ctx.body = { ok: false, message: '任务不可应答' }
@@ -54,9 +60,9 @@ export default class RunController extends Controller {
 
         if (!request) return ctx.body = { ok: false, message: '无可应答请求' }
         if (request.voidInfo) return ctx.body = { ok: false, message: '请求已作废' }
-        if (request.responses?.at(-1)?.kind === 'decision') return ctx.body = {ok:false, message: '请求应答已结束'}
+        if (request.responses?.at(-1)?.kind === 'decision') return ctx.body = { ok: false, message: '请求应答已结束' }
 
-        await respondRun(run, task, request, action, payload)
+        await respondRun(run, task, request, action, payload, operator)
 
         ctx.body = { ok: true }
     }

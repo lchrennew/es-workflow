@@ -72,11 +72,13 @@
   - 除 `end` 外的所有状态都必须存在一条“到达 `end` 的路径”（允许环路，但环路必须有通向 `end` 的出口，避免闭环孤岛）
 
 ### WorkflowRun.id（运行标识）
-- 形式：`<工作流标识>.<ObjectId>`
-- 说明：
-  - 工作流标识来源于 `Workflow.name`，并将 `/` 替换为 `.`
-  - ObjectId 部分用于唯一标识该次运行，可从中提取创建时间戳
-  - 示例：Workflow.name=`order/approval`，则 id 可为 `order.approval.507f1f77bcf86cd799439011`
+- 形式：ObjectId
+- 说明：用于唯一标识该次运行，可从中提取创建时间戳；工作流标识由 `WorkflowRun.name` 承载
+
+### WorkflowRun.businessId（外部事项标识）
+- 含义：外部业务系统的单据/事项 ID（case/document id）
+- 约束：**全局唯一**（如何做到全局唯一不属于工作流引擎的职责）
+- 语义：WorkflowRun 表达“该单据/事项在某条工作流上的一次运行”
 
 ### WorkflowTask（工作流任务）
 - 含义：某个状态被激活后生成的运行期任务（值对象），用于承载"该状态对应的处理工作"。
@@ -87,8 +89,8 @@
   - 这样后续运行尽量不再依赖配置域中的原始 `state`，也便于支持前/后加签等动态增添任务场景
 - 生命周期（当前约定）：
   - 初始为 `initialized`
-  - 当 `task.conditions` 通过后进入 `in-progress`
-  - 当 `task.conditions` 不通过时：进入 `Ignored`，并统一触发内部事件 `ignored`
+  - 当 `state.conditions` 通过后进入 `in-progress`
+  - 当 `state.conditions` 不通过时：进入 `Ignored`，并统一触发内部事件 `ignored`
   - 结束后产生 `outputParameters`
 - 参数：每个 Task 也拥有 `inputParameters/livingParameters/outputParameters` 三段式参数（作用域在 Task 内）。
   - 约定：Task 进入终态（Completed/Ignored）时，将 `task.outputParameters` 合并到 `run.livingParameters`。

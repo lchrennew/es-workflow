@@ -11,10 +11,9 @@
 ## 运行期静态模型：WorkflowRun（草案）
 
 ### 设计要点（来自你的约束）
-1. `WorkflowRun.id` 格式：`<工作流标识>.<ObjectId>`
-   - 工作流标识来自 `Workflow.name`，并将 `/` 替换为 `.`
-   - ObjectId 部分用于唯一标识该次运行
-   - 示例：`order.approval.507f1f77bcf86cd799439011`
+1. `WorkflowRun.id` 使用 ObjectId（不包含工作流标识前缀）
+   - 说明：workflow 标识由 `WorkflowRun.name` 承载
+2. `WorkflowRun.businessId`：外部业务系统的单据/事项 ID（约束：全局唯一；引擎不负责如何做到全局唯一）
 2. 时间字段采用 UTC 字符串：`YYYY-MM-DD HH:mm:ss`
 3. 参数 key 命名与 value 类型约束：见配置域文档的"参数命名与类型规则（已确认）"
 
@@ -26,6 +25,7 @@ direction LR
 
 class WorkflowRun {
   +String id  %% ObjectID
+  +String businessId
   +String name
   +Workflow config
   +WorkflowRunStatus status
@@ -109,10 +109,10 @@ TaskTransition *-- TaskTransitionTarget : targets
 ```
 
 ### 字段说明（草案）
-- `id`：`<workflowNameWithDots>.<ObjectId>`
-  - `workflowNameWithDots = name.replaceAll("/", ".")`
-  - 示例：`order.approval.507f1f77bcf86cd799439011`
-  - ObjectId 部分可用于提取创建时间
+- `id`：ObjectId（可从中提取创建时间戳）
+- `businessId`：外部业务系统的单据/事项 ID（全局唯一）
+  - 语义：WorkflowRun 表达“该单据/事项在某条工作流上的一次运行”
+  - 推荐约束：同一个 `businessId` 只能创建一个 WorkflowRun（用于幂等发起）
 - `name`：引用配置域 `Workflow.name`（path 形式）
 - `config`：创建该 WorkflowRun 时所使用的 Workflow 配置（快照/引用策略后续再定）
 - `status`：运行状态（见下方状态机草案）
@@ -350,9 +350,9 @@ participant Spec as WorkflowSpec
 participant Cond as ConditionEvaluator
 participant Third as 第三方处理方
 
-Caller->>Engine: startRun(name, inputParameters)
+Caller->>Engine: startRun(name, businessId, inputParameters)
 Engine->>Spec: loadWorkflow(name)
-Engine->>Run: create(id,name,config)\nstatus=Initialized
+Engine->>Run: create(id,name,businessId,config)\nstatus=Initialized
 Engine->>Run: set inputParameters
 Engine->>Run: init livingParameters(from input)
 Engine->>Run: status=Running
