@@ -1,0 +1,9 @@
+kind: target-system
+name: data-webhook-api
+metadata:
+  title: Data Webhook API 服务
+spec:
+  default: http://localhost:4244/webhook
+  development: http://localhost:4244/webhook
+  staging: https://data-staging.example.com/webhook
+  production: https://data.example.com/webhook

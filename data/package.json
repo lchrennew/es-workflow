@@ -7,6 +7,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "koa-es-template": "^1.0.51"
+    "koa-es-template": "^1.0.51",
+    "mongodb": "^7.2.0"
   }
 }

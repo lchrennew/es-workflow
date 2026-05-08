@@ -1,5 +1,5 @@
 import { Controller } from "koa-es-template";
-import { loadRun, nextTick, logKeyChange, respondRun, saveRun } from "../core/run.js";
+import { loadRun, logKeyChange, nextTick, respondRun, saveRun } from "../core/run.js";
 import { generateObjectID } from "es-object-id";
 
 export default class RunController extends Controller {
@@ -53,6 +53,8 @@ export default class RunController extends Controller {
         const request = task.requests.find(request => request.id === requestId)
 
         if (!request) return ctx.body = { ok: false, message: '无可应答请求' }
+        if (request.voidInfo) return ctx.body = { ok: false, message: '请求已作废' }
+        if (request.responses?.at(-1)?.kind === 'decision') return ctx.body = {ok:false, message: '请求应答已结束'}
 
         await respondRun(run, task, request, action, payload)
 

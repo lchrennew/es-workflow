@@ -5,3 +5,4 @@ metadata:
 spec:
   triggers:
     - engine-response-received-trigger
+    - data-response-received-trigger

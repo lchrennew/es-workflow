@@ -1,0 +1,22 @@
+kind: template
+name: data-request-void-template
+metadata:
+  title: Data request.void 事件模板
+spec:
+  path: /request-void
+  method: POST
+  format: json
+  headers:
+    Content-Type: application/json
+  body:
+    eventType: request.void
+    runId: $RUN_ID$
+    taskId: $TASK_ID$
+    requestId: $REQUEST_ID$
+    workflowId: $WORKFLOW_ID$
+    action: $ACTION$
+    reason: $REASON$
+    timestamp: $(Number)TIMESTAMP$
+    run: $...RUN$
+    task: $...TASK$
+    request: $...REQUEST$

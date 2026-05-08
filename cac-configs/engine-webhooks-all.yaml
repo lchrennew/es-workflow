@@ -575,6 +575,7 @@ metadata:
 spec:
   triggers:
     - engine-request-sent-trigger
+    - data-request-sent-trigger
 
 ---
 kind: listener
@@ -584,6 +585,7 @@ metadata:
 spec:
   triggers:
     - engine-request-void-trigger
+    - data-request-void-trigger
 
 ---
 kind: listener
@@ -593,6 +595,7 @@ metadata:
 spec:
   triggers:
     - engine-response-received-trigger
+    - data-response-received-trigger
 
 ---
 kind: listener

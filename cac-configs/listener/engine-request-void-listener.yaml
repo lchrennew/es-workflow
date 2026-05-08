@@ -5,3 +5,4 @@ metadata:
 spec:
   triggers:
     - engine-request-void-trigger
+    - data-request-void-trigger

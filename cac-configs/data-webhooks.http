@@ -1,0 +1,101 @@
+### Test request.sent event forwarding to Data service via Triggers
+### Engine发送到已有的listener，listener会触发两个trigger：一个转发回Engine，一个转发到Data
+POST http://localhost:4243/hook/engine-request-sent-listener
+Content-Type: application/json
+X-Webhook-Event: request.sent
+
+{
+  "runId": "507f1f77bcf86cd799439011",
+  "taskId": "507f191e810c19729de860ea",
+  "requestId": "507f191e810c19729de860eb",
+  "run": {
+    "id": "507f1f77bcf86cd799439011",
+    "workflowId": "deploy-workflow",
+    "workflowName": "部署工作流",
+    "status": "running"
+  },
+  "task": {
+    "id": "507f191e810c19729de860ea",
+    "name": "发送部署请求",
+    "status": "running"
+  },
+  "request": {
+    "id": "507f191e810c19729de860eb",
+    "method": "POST",
+    "url": "https://api.example.com/deploy",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "version": "1.0.0"
+    }
+  }
+}
+
+### Test request.void event forwarding to Data service via Triggers
+POST http://localhost:4243/hook/engine-request-void-listener
+Content-Type: application/json
+X-Webhook-Event: request.void
+
+{
+  "runId": "507f1f77bcf86cd799439011",
+  "taskId": "507f191e810c19729de860ea",
+  "requestId": "507f191e810c19729de860eb",
+  "action": "cancel",
+  "reason": "timeout exceeded",
+  "run": {
+    "id": "507f1f77bcf86cd799439011",
+    "workflowId": "deploy-workflow",
+    "workflowName": "部署工作流",
+    "status": "running"
+  },
+  "task": {
+    "id": "507f191e810c19729de860ea",
+    "name": "发送部署请求",
+    "status": "failed"
+  },
+  "request": {
+    "id": "507f191e810c19729de860eb",
+    "method": "POST",
+    "url": "https://api.example.com/deploy",
+    "status": "voided"
+  }
+}
+
+### Test response.received event forwarding to Data service via Triggers
+POST http://localhost:4243/hook/engine-response-received-listener
+Content-Type: application/json
+X-Webhook-Event: response.received
+
+{
+  "runId": "507f1f77bcf86cd799439011",
+  "taskId": "507f191e810c19729de860ea",
+  "requestId": "507f191e810c19729de860eb",
+  "run": {
+    "id": "507f1f77bcf86cd799439011",
+    "workflowId": "deploy-workflow",
+    "workflowName": "部署工作流",
+    "status": "running"
+  },
+  "task": {
+    "id": "507f191e810c19729de860ea",
+    "name": "发送部署请求",
+    "status": "completed"
+  },
+  "request": {
+    "id": "507f191e810c19729de860eb",
+    "method": "POST",
+    "url": "https://api.example.com/deploy"
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "success": true,
+      "deploymentId": "dep-12345"
+    }
+  }
+}

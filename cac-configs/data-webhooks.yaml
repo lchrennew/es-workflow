@@ -1,0 +1,198 @@
+---
+kind: target-system
+name: data-webhook-api
+metadata:
+  title: Data Webhook API 服务
+spec:
+  default: http://localhost:4244/webhook
+  development: http://localhost:4244/webhook
+  staging: https://data-staging.example.com/webhook
+  production: https://data.example.com/webhook
+
+---
+kind: binding
+name: data-webhook-binding
+metadata:
+  title: Data Webhook 数据绑定
+spec:
+  script: |
+    variables.EVENT_TYPE = headers['x-webhook-event'] || 'unknown';
+    variables.RUN_ID = body.run?.id || body.runId || '';
+    variables.TASK_ID = body.taskId || '';
+    variables.REQUEST_ID = body.requestId || body.request?.id || '';
+    variables.WORKFLOW_ID = body.run?.workflowId || '';
+    variables.ACTION = body.action || '';
+    variables.REASON = body.reason || '';
+    variables.TIMESTAMP = dayjs().unix();
+    
+    variables.RUN = JSON.stringify(body.run || {});
+    variables.TASK = JSON.stringify(body.task || {});
+    variables.REQUEST = JSON.stringify(body.request || {});
+    variables.RESPONSE = JSON.stringify(body.response || {});
+    
+    variables['@'] = query.env || 'production';
+
+---
+kind: template
+name: data-request-sent-template
+metadata:
+  title: Data request.sent 事件模板
+spec:
+  path: /request-sent
+  method: POST
+  format: json
+  headers:
+    Content-Type: application/json
+  body:
+    eventType: request.sent
+    runId: $RUN_ID$
+    taskId: $TASK_ID$
+    requestId: $REQUEST_ID$
+    workflowId: $WORKFLOW_ID$
+    timestamp: $(Number)TIMESTAMP$
+    run: $...RUN$
+    task: $...TASK$
+    request: $...REQUEST$
+
+---
+kind: template
+name: data-request-void-template
+metadata:
+  title: Data request.void 事件模板
+spec:
+  path: /request-void
+  method: POST
+  format: json
+  headers:
+    Content-Type: application/json
+  body:
+    eventType: request.void
+    runId: $RUN_ID$
+    taskId: $TASK_ID$
+    requestId: $REQUEST_ID$
+    workflowId: $WORKFLOW_ID$
+    action: $ACTION$
+    reason: $REASON$
+    timestamp: $(Number)TIMESTAMP$
+    run: $...RUN$
+    task: $...TASK$
+    request: $...REQUEST$
+
+---
+kind: template
+name: data-response-received-template
+metadata:
+  title: Data response.received 事件模板
+spec:
+  path: /response-received
+  method: POST
+  format: json
+  headers:
+    Content-Type: application/json
+  body:
+    eventType: response.received
+    runId: $RUN_ID$
+    taskId: $TASK_ID$
+    requestId: $REQUEST_ID$
+    workflowId: $WORKFLOW_ID$
+    timestamp: $(Number)TIMESTAMP$
+    run: $...RUN$
+    task: $...TASK$
+    request: $...REQUEST$
+    response: $...RESPONSE$
+
+---
+kind: trigger
+name: data-request-sent-trigger
+metadata:
+  title: Data request.sent 触发器
+spec:
+  sourceInterceptor: engine-webhook-filter
+  targetInterceptor: never-intercept
+  binding: data-webhook-binding
+  template: data-request-sent-template
+  targetSystem: data-webhook-api
+
+---
+kind: trigger
+name: data-request-void-trigger
+metadata:
+  title: Data request.void 触发器
+spec:
+  sourceInterceptor: engine-webhook-filter
+  targetInterceptor: never-intercept
+  binding: data-webhook-binding
+  template: data-request-void-template
+  targetSystem: data-webhook-api
+
+---
+kind: trigger
+name: data-response-received-trigger
+metadata:
+  title: Data response.received 触发器
+spec:
+  sourceInterceptor: engine-webhook-filter
+  targetInterceptor: never-intercept
+  binding: data-webhook-binding
+  template: data-response-received-template
+  targetSystem: data-webhook-api
+
+---
+kind: target-request
+name: data-request-sent
+metadata:
+  title: Data request.sent 目标请求
+spec:
+  props:
+    trigger: data-request-sent-trigger
+    binding: data-webhook-binding
+    template: data-request-sent-template
+    targetSystem: data-webhook-api
+  errorTracking:
+    enabled: true
+    eventName: data-webhook-forward-failed
+  postResponseScript: |
+    console.log('request.sent forwarded to Data service:', response?.status);
+    if (!response?.ok) {
+      console.error('Forward to Data failed:', response?.statusText);
+    }
+
+---
+kind: target-request
+name: data-request-void
+metadata:
+  title: Data request.void 目标请求
+spec:
+  props:
+    trigger: data-request-void-trigger
+    binding: data-webhook-binding
+    template: data-request-void-template
+    targetSystem: data-webhook-api
+  errorTracking:
+    enabled: true
+    eventName: data-webhook-forward-failed
+  postResponseScript: |
+    console.log('request.void forwarded to Data service:', response?.status);
+    if (!response?.ok) {
+      console.error('Forward to Data failed:', response?.statusText);
+    }
+
+---
+kind: target-request
+name: data-response-received
+metadata:
+  title: Data response.received 目标请求
+spec:
+  props:
+    trigger: data-response-received-trigger
+    binding: data-webhook-binding
+    template: data-response-received-template
+    targetSystem: data-webhook-api
+  errorTracking:
+    enabled: true
+    eventName: data-webhook-forward-failed
+  postResponseScript: |
+    console.log('response.received forwarded to Data service:', response?.status);
+    if (!response?.ok) {
+      console.error('Forward to Data failed:', response?.statusText);
+    }

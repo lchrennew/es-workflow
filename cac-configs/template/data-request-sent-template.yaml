@@ -1,0 +1,20 @@
+kind: template
+name: data-request-sent-template
+metadata:
+  title: Data request.sent 事件模板
+spec:
+  path: /request-sent
+  method: POST
+  format: json
+  headers:
+    Content-Type: application/json
+  body:
+    eventType: request.sent
+    runId: $RUN_ID$
+    taskId: $TASK_ID$
+    requestId: $REQUEST_ID$
+    workflowId: $WORKFLOW_ID$
+    timestamp: $(Number)TIMESTAMP$
+    run: $...RUN$
+    task: $...TASK$
+    request: $...REQUEST$

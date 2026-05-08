@@ -1,0 +1,104 @@
+### Test request.sent webhook
+POST http://localhost:4244/webhook/request-sent
+Content-Type: application/json
+
+{
+  "eventType": "request.sent",
+  "runId": "507f1f77bcf86cd799439011",
+  "taskId": "507f191e810c19729de860ea",
+  "requestId": "507f191e810c19729de860eb",
+  "workflowId": "deploy-workflow",
+  "timestamp": 1234567890,
+  "run": {
+    "id": "507f1f77bcf86cd799439011",
+    "workflowId": "deploy-workflow",
+    "status": "running"
+  },
+  "task": {
+    "id": "507f191e810c19729de860ea",
+    "runId": "507f1f77bcf86cd799439011",
+    "stateName": "deploy",
+    "status": "running"
+  },
+  "request": {
+    "id": "507f191e810c19729de860eb",
+    "taskId": "507f191e810c19729de860ea",
+    "url": "https://api.example.com/deploy",
+    "method": "POST",
+    "status": "sent"
+  }
+}
+
+### Test request.void webhook
+POST http://localhost:4244/webhook/request-void
+Content-Type: application/json
+
+{
+  "eventType": "request.void",
+  "runId": "507f1f77bcf86cd799439011",
+  "taskId": "507f191e810c19729de860ea",
+  "requestId": "507f191e810c19729de860eb",
+  "workflowId": "deploy-workflow",
+  "timestamp": 1234567890,
+  "action": "cancel",
+  "reason": "Task timeout",
+  "run": {
+    "id": "507f1f77bcf86cd799439011",
+    "workflowId": "deploy-workflow",
+    "status": "running"
+  },
+  "task": {
+    "id": "507f191e810c19729de860ea",
+    "runId": "507f1f77bcf86cd799439011",
+    "stateName": "deploy",
+    "status": "failed"
+  },
+  "request": {
+    "id": "507f191e810c19729de860eb",
+    "taskId": "507f191e810c19729de860ea",
+    "url": "https://api.example.com/deploy",
+    "method": "POST",
+    "status": "void"
+  }
+}
+
+### Test response.received webhook
+POST http://localhost:4244/webhook/response-received
+Content-Type: application/json
+
+{
+  "eventType": "response.received",
+  "runId": "507f1f77bcf86cd799439011",
+  "taskId": "507f191e810c19729de860ea",
+  "requestId": "507f191e810c19729de860eb",
+  "workflowId": "deploy-workflow",
+  "timestamp": 1234567890,
+  "run": {
+    "id": "507f1f77bcf86cd799439011",
+    "workflowId": "deploy-workflow",
+    "status": "running"
+  },
+  "task": {
+    "id": "507f191e810c19729de860ea",
+    "runId": "507f1f77bcf86cd799439011",
+    "stateName": "deploy",
+    "status": "running"
+  },
+  "request": {
+    "id": "507f191e810c19729de860eb",
+    "taskId": "507f191e810c19729de860ea",
+    "url": "https://api.example.com/deploy",
+    "method": "POST",
+    "status": "completed",
+    "response": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "success": true,
+        "deployId": "deploy-123"
+      }
+    }
+  }
+}

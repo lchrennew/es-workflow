@@ -1,0 +1,18 @@
+kind: target-request
+name: data-request-void
+metadata:
+  title: Data request.void 目标请求
+spec:
+  props:
+    trigger: data-request-void-trigger
+    binding: data-webhook-binding
+    template: data-request-void-template
+    targetSystem: data-webhook-api
+  errorTracking:
+    enabled: true
+    eventName: data-webhook-forward-failed
+  postResponseScript: |
+    console.log('request.void forwarded to Data service:', response?.status);
+    if (!response?.ok) {
+      console.error('Forward to Data failed:', response?.statusText);
+    }

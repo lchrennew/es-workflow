@@ -1,0 +1,21 @@
+kind: template
+name: data-response-received-template
+metadata:
+  title: Data response.received 事件模板
+spec:
+  path: /response-received
+  method: POST
+  format: json
+  headers:
+    Content-Type: application/json
+  body:
+    eventType: response.received
+    runId: $RUN_ID$
+    taskId: $TASK_ID$
+    requestId: $REQUEST_ID$
+    workflowId: $WORKFLOW_ID$
+    timestamp: $(Number)TIMESTAMP$
+    run: $...RUN$
+    task: $...TASK$
+    request: $...REQUEST$
+    response: $...RESPONSE$

@@ -1,0 +1,18 @@
+kind: target-request
+name: data-request-sent
+metadata:
+  title: Data request.sent 目标请求
+spec:
+  props:
+    trigger: data-request-sent-trigger
+    binding: data-webhook-binding
+    template: data-request-sent-template
+    targetSystem: data-webhook-api
+  errorTracking:
+    enabled: true
+    eventName: data-webhook-forward-failed
+  postResponseScript: |
+    console.log('request.sent forwarded to Data service:', response?.status);
+    if (!response?.ok) {
+      console.error('Forward to Data failed:', response?.statusText);
+    }

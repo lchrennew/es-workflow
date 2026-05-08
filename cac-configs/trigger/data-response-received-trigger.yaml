@@ -1,0 +1,10 @@
+kind: trigger
+name: data-response-received-trigger
+metadata:
+  title: Data response.received 触发器
+spec:
+  sourceInterceptor: engine-webhook-filter
+  targetInterceptor: never-intercept
+  binding: data-webhook-binding
+  template: data-response-received-template
+  targetSystem: data-webhook-api

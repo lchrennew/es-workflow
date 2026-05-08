@@ -5,3 +5,4 @@ metadata:
 spec:
   triggers:
     - engine-request-sent-trigger
+    - data-request-sent-trigger

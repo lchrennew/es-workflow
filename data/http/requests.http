@@ -1,0 +1,20 @@
+### Query all requests
+GET http://localhost:4244/requests/query
+
+### Query requests by target
+GET http://localhost:4244/requests/query?target=user1
+
+### Query requests by status
+GET http://localhost:4244/requests/query?status=sent
+
+### Query requests by target and status
+GET http://localhost:4244/requests/query?target=user1&status=sent
+
+### Query with pagination
+GET http://localhost:4244/requests/query?target=user1&status=sent&page=1&pageSize=10
+
+### Query responded requests
+GET http://localhost:4244/requests/query?status=responded
+
+### Query voided requests
+GET http://localhost:4244/requests/query?status=voided

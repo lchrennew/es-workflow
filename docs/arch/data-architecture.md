@@ -2,17 +2,57 @@
 
 ## 概述
 
-Data是ES-Workflow的数据查询服务，负责提供工作流运行数据的查询API。通过接收Triggers转发的webhook事件来同步运行数据，并提供高效的查询接口。基于Node.js + Koa构建。
+Data是ES-Workflow的数据查询服务，负责提供工作流运行数据的查询API。通过接收Triggers转发的webhook事件来同步运行数据，并提供高效的查询接口。基于Node.js + Koa构建，运行在4244端口。
+
+## 事件转发配置
+
+Data服务通过Triggers接收来自Engine的webhook事件。采用**多路分发**机制，在现有的listener上增加新的trigger，实现一个事件同时转发到Engine和Data两个目标。
+
+**转发链路**：
+```
+Engine → Triggers (listener) → 多路分发
+                                ├─→ Engine (原有trigger)
+                                └─→ Data (新增trigger)
+```
+
+**配置的事件**：
+1. **request.sent** - 请求发送事件
+   - Engine webhook: `WEBHOOK_REQUEST_SENT=http://localhost:4243/hook/engine-request-sent-listener`
+   - Triggers listener: `engine-request-sent-listener` (配置了2个trigger)
+     - `engine-request-sent-trigger` → Engine webhook API
+     - `data-request-sent-trigger` → Data webhook API
+   - Data endpoint: `POST /webhook/request-sent`
+
+2. **request.void** - 请求作废事件
+   - Engine webhook: `WEBHOOK_REQUEST_VOID=http://localhost:4243/hook/engine-request-void-listener`
+   - Triggers listener: `engine-request-void-listener` (配置了2个trigger)
+     - `engine-request-void-trigger` → Engine webhook API
+     - `data-request-void-trigger` → Data webhook API
+   - Data endpoint: `POST /webhook/request-void`
+
+3. **response.received** - 响应接收事件
+   - Engine webhook: `WEBHOOK_RESPONSE_RECEIVED=http://localhost:4243/hook/engine-response-received-listener`
+   - Triggers listener: `engine-response-received-listener` (配置了2个trigger)
+     - `engine-response-received-trigger` → Engine webhook API
+     - `data-response-received-trigger` → Data webhook API
+   - Data endpoint: `POST /webhook/response-received`
+
+**配置文件**：
+- `/cac-configs/engine-webhooks-all.yaml`: 修改三个listener，添加data-*-trigger
+- `/cac-configs/data-webhooks.yaml`: 新增配置，包含：
+  - `target-system`: data-webhook-api (指向Data服务的webhook端点)
+  - `binding`: data-webhook-binding (数据绑定脚本)
+  - `template`: 三个事件模板 (定义转发的数据格式)
+  - `trigger`: 三个触发器 (关联binding和template)
+  - `target-request`: 三个目标请求 (执行转发并记录日志)
 
 ## 架构图
 
 ```mermaid
 graph TB
     subgraph Routes[路由层]
-        QueryAPI[Query API<br/>/query]
-        RunAPI[Run API<br/>/runs]
-        TaskAPI[Task API<br/>/tasks]
         WebhookAPI[Webhook API<br/>/webhook]
+        RequestAPI[Request API<br/>/requests]
     end
     
     subgraph Core[核心层]
@@ -22,37 +62,23 @@ graph TB
     end
     
     subgraph Storage[存储层]
-        RunStore[Run Store<br/>运行数据]
-        TaskStore[Task Store<br/>任务数据]
         RequestStore[Request Store<br/>请求数据]
-        EventStore[Event Store<br/>事件数据]
     end
     
     subgraph External[外部依赖]
         Triggers[Triggers服务<br/>:4243]
-        Database[(数据库<br/>MongoDB/PostgreSQL)]
+        Database[(MongoDB<br/>requests collection)]
     end
     
     WebhookAPI --> EventHandler
-    QueryAPI --> QueryService
-    RunAPI --> QueryService
-    TaskAPI --> QueryService
+    RequestAPI --> QueryService
     
     EventHandler --> DataSync
-    DataSync --> RunStore
-    DataSync --> TaskStore
     DataSync --> RequestStore
-    DataSync --> EventStore
     
-    QueryService --> RunStore
-    QueryService --> TaskStore
     QueryService --> RequestStore
-    QueryService --> EventStore
     
-    RunStore --> Database
-    TaskStore --> Database
     RequestStore --> Database
-    EventStore --> Database
     
     Triggers -.->|转发Webhook事件| WebhookAPI
     
@@ -61,9 +87,9 @@ graph TB
     classDef storageStyle fill:#FF9800,stroke:#F57C00,color:#fff
     classDef externalStyle fill:#9E9E9E,stroke:#616161,color:#fff
     
-    class QueryAPI,RunAPI,TaskAPI,WebhookAPI routeStyle
+    class WebhookAPI,RequestAPI routeStyle
     class EventHandler,QueryService,DataSync coreStyle
-    class RunStore,TaskStore,RequestStore,EventStore storageStyle
+    class RequestStore storageStyle
     class Triggers,Database externalStyle
 ```
 
@@ -100,102 +126,94 @@ graph TB
 ### 2. Data Sync（数据同步）
 
 **职责**：
-- 根据事件更新数据存储
-- 维护数据一致性
+- 根据webhook事件同步请求数据
+- 维护请求状态的完整生命周期
 - 处理事件顺序和重复
 
 **同步策略**：
-- **增量同步**：只更新变化的数据
-- **幂等性**：重复事件不会导致数据错误
-- **顺序保证**：使用timestamp确保事件顺序
+- **专注请求**: 只同步和管理HTTP请求数据
+- **幂等性**: request.sent使用insert，void和received使用update，重复事件不会导致数据错误
+- **状态追踪**: 完整记录请求的sent、voided、responded状态
+
+**MongoDB Collection**：
+- `requests` - HTTP请求记录（唯一collection）
+
+**事件处理逻辑**：
+
+#### request.sent 事件
+1. **创建Request**: insert request到 `requests` collection
+   - 状态: `sent`
+   - 包含: requestId, runId, taskId, taskName, request数据, sentAt时间
+
+#### request.void 事件
+1. **更新Request**: 更新request状态和作废信息
+   - 状态: `voided`
+   - 记录: action, reason, voidedAt时间
+
+#### response.received 事件
+1. **添加Response**: 将response添加到requests的responses数组
+2. **条件更新状态**: 仅当response.kind为'decision'时
+   - 更新request状态为 `responded`
+   - 记录respondedAt时间
 
 **数据模型**：
-
-#### Run（工作流实例）
-```javascript
-{
-  id: String,
-  workflowId: String,
-  workflowName: String,
-  status: 'initialized' | 'running' | 'completed',
-  startTime: Date,
-  endTime: Date,
-  inputParameters: Object,
-  outputParameters: Object,
-  tasks: [TaskId],
-  createdAt: Date,
-  updatedAt: Date
-}
-```
-
-#### Task（任务）
-```javascript
-{
-  id: String,
-  runId: String,
-  stateName: String,
-  status: 'pending' | 'running' | 'completed' | 'failed',
-  startTime: Date,
-  endTime: Date,
-  inputParameters: Object,
-  outputParameters: Object,
-  requests: [RequestId],
-  createdAt: Date,
-  updatedAt: Date
-}
-```
 
 #### Request（请求）
 ```javascript
 {
-  id: String,
-  taskId: String,
-  runId: String,
-  url: String,
-  method: String,
-  headers: Object,
-  body: Object,
-  status: 'pending' | 'sent' | 'completed' | 'failed' | 'void',
-  sentTime: Date,
-  completedTime: Date,
-  response: {
+  _id: String,              // requestId
+  runId: String,            // 所属运行ID
+  taskId: String,           // 所属任务ID
+  taskName: String,         // 任务显示名称 (task.name || task.stateName)
+  url: String,              // 请求URL
+  method: String,           // HTTP方法
+  headers: Object,          // 请求头
+  body: Object,             // 请求体
+  status: 'sent' | 'voided' | 'responded',  // 请求状态
+  responses: [{             // 响应数组 (一个请求可以有多个响应)
+    kind: String,           // 响应类型 (decision, notification等)
     status: Number,
+    statusText: String,
     headers: Object,
-    body: Object
-  },
-  createdAt: Date,
-  updatedAt: Date
+    body: Object,
+    receivedAt: Date
+  }],
+  sentAt: Date,             // 发送时间
+  voidedAt: Date,           // 作废时间 (可选)
+  respondedAt: Date,        // 最终响应时间 (可选，仅当收到decision响应时设置)
+  action: String,           // 作废动作 (可选: cancel, retry, skip)
+  reason: String,           // 作废原因 (可选)
+  createdAt: Date,          // 创建时间
+  updatedAt: Date           // 更新时间
 }
 ```
 
-#### Event（事件）
-```javascript
-{
-  id: String,
-  eventType: String,
-  runId: String,
-  taskId: String,
-  requestId: String,
-  timestamp: Date,
-  data: Object,
-  createdAt: Date
-}
+**状态流转**：
 ```
+sent → voided (请求被作废)
+sent → responded (收到decision响应)
+```
+
+**响应处理规则**：
+- 一个request可以收到多个response
+- 所有response都会被添加到responses数组
+- 只有当response.kind为'decision'时，才会更新request状态为'responded'
 
 ### 3. Query Service（查询服务）
 
 **职责**：
-- 提供数据查询API
+- 提供请求数据查询API
 - 支持复杂查询和聚合
 - 分页和排序
 
 **查询能力**：
-- 按Run ID查询完整运行数据
-- 按Workflow ID查询历史运行
+- 按Request ID查询单个请求
+- 按Run ID查询运行的所有请求
+- 按Task ID查询任务的所有请求
 - 按时间范围查询
-- 按状态筛选
-- 全文搜索
-- 聚合统计
+- 按状态筛选 (sent/voided/responded)
+- 按任务名称搜索
+- 聚合统计 (成功率、响应时间等)
 
 ## 数据同步流程
 
@@ -204,41 +222,24 @@ sequenceDiagram
     participant Engine as Engine服务
     participant Triggers as Triggers服务
     participant Data as Data服务
-    participant DB as 数据库
+    participant DB as MongoDB
     
-    Engine->>Triggers: 发送run.started事件
-    Triggers->>Triggers: 转发配置处理
-    Triggers->>Data: POST /webhook/run-started
+    Engine->>Triggers: 发送request.sent事件
+    Triggers->>Triggers: 多路分发处理
+    Triggers->>Data: POST /webhook/request-sent
     Data->>Data: 解析事件
-    Data->>DB: 创建Run记录
+    Data->>DB: 创建Request记录
     DB-->>Data: 保存成功
     Data-->>Triggers: 返回200
     
-    Engine->>Triggers: 发送task.started事件
-    Triggers->>Data: POST /webhook/task-started
-    Data->>DB: 创建Task记录
-    Data->>DB: 更新Run的tasks数组
-    Data-->>Triggers: 返回200
-    
-    Engine->>Triggers: 发送request.sent事件
-    Triggers->>Data: POST /webhook/request-sent
-    Data->>DB: 创建Request记录
-    Data->>DB: 更新Task的requests数组
+    Engine->>Triggers: 发送request.void事件
+    Triggers->>Data: POST /webhook/request-void
+    Data->>DB: 更新Request状态为voided
     Data-->>Triggers: 返回200
     
     Engine->>Triggers: 发送response.received事件
     Triggers->>Data: POST /webhook/response-received
-    Data->>DB: 更新Request记录
-    Data-->>Triggers: 返回200
-    
-    Engine->>Triggers: 发送task.completed事件
-    Triggers->>Data: POST /webhook/task-completed
-    Data->>DB: 更新Task状态
-    Data-->>Triggers: 返回200
-    
-    Engine->>Triggers: 发送run.completed事件
-    Triggers->>Data: POST /webhook/run-completed
-    Data->>DB: 更新Run状态
+    Data->>DB: 更新Request状态为responded
     Data-->>Triggers: 返回200
 ```
 
@@ -246,223 +247,161 @@ sequenceDiagram
 
 ### Webhook API（接收事件）
 
-**接收run事件**：
-```
-POST /webhook/run-started
-POST /webhook/run-completed
-```
-
-**接收task事件**：
-```
-POST /webhook/task-started
-POST /webhook/task-completed
-POST /webhook/task-updated
-```
-
 **接收request事件**：
 ```
-POST /webhook/request-sent
-POST /webhook/request-void
-POST /webhook/response-received
+POST /webhook/request-sent       # 请求发送事件
+POST /webhook/request-void       # 请求作废事件
+POST /webhook/response-received  # 响应接收事件
+```
+
+**请求格式**：
+```json
+{
+  "eventType": "request.sent",
+  "runId": "507f1f77bcf86cd799439011",
+  "taskId": "507f191e810c19729de860ea",
+  "requestId": "507f191e810c19729de860eb",
+  "workflowId": "deploy-workflow",
+  "timestamp": 1234567890,
+  "run": { /* Run对象 */ },
+  "task": { /* Task对象 */ },
+  "request": { /* Request对象 */ }
+}
+```
+
+**响应格式**：
+```json
+{
+  "success": true,
+  "message": "request.sent event processed successfully",
+  "data": {
+    "runId": "507f1f77bcf86cd799439011",
+    "taskId": "507f191e810c19729de860ea",
+    "requestId": "507f191e810c19729de860eb",
+    "timestamp": 1234567890
+  }
+}
 ```
 
 ### Query API（查询数据）
 
-**查询Run**：
-```
-GET /runs/:id                    # 获取单个Run详情
-GET /runs                        # 查询Run列表
-GET /runs/:id/tasks              # 获取Run的所有Task
-GET /runs/:id/timeline           # 获取Run的时间线
-```
-
-**查询Task**：
-```
-GET /tasks/:id                   # 获取单个Task详情
-GET /tasks                       # 查询Task列表
-GET /tasks/:id/requests          # 获取Task的所有Request
-```
-
 **查询Request**：
 ```
-GET /requests/:id                # 获取单个Request详情
-GET /requests                    # 查询Request列表
+GET /requests/query              # 查询Request列表
+GET /requests/query?target=xxx   # 按target查询
+GET /requests/query?status=sent  # 按状态查询
+GET /requests/query?target=xxx&status=sent  # 按target和status组合查询
+GET /requests/query?page=1&pageSize=20      # 分页查询
 ```
 
-**统计查询**：
+**查询参数**：
+- `target`: 请求目标（可选）
+- `status`: 请求状态（可选，值：sent/voided/responded）
+- `page`: 页码（可选，默认1）
+- `pageSize`: 每页数量（可选，默认20）
+
+**响应格式**：
+```json
+{
+  "success": true,
+  "data": {
+    "requests": [
+      {
+        "_id": "507f191e810c19729de860eb",
+        "runId": "507f1f77bcf86cd799439011",
+        "taskId": "507f191e810c19729de860ea",
+        "taskName": "审核",
+        "target": "user1",
+        "status": "sent",
+        "responses": [],
+        "sentAt": "2024-01-01T00:00:00.000Z",
+        "createdAt": "2024-01-01T00:00:00.000Z"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "pageSize": 20,
+      "total": 100,
+      "totalPages": 5
+    }
+  }
+}
 ```
-GET /stats/runs                  # Run统计
-GET /stats/workflows             # Workflow统计
-GET /stats/success-rate          # 成功率统计
+
+## 数据存储
+
+### MongoDB
+
+**选择原因**：
+- 文档模型适合存储请求数据的复杂结构
+- 灵活的schema适应request数据的多样性
+- 强大的查询和聚合能力
+- 良好的水平扩展性
+
+**Collection设计**：
+- `requests` - 存储所有HTTP请求记录
+
+**索引设计**：
+```javascript
+db.requests.createIndex({ target: 1, status: 1, createdAt: -1 })
+db.requests.createIndex({ target: 1, createdAt: -1 })
+db.requests.createIndex({ status: 1, createdAt: -1 })
+db.requests.createIndex({ runId: 1, createdAt: -1 })
+db.requests.createIndex({ taskId: 1, createdAt: -1 })
+db.requests.createIndex({ sentAt: -1 })
+db.requests.createIndex({ taskName: 1 })
 ```
-
-### 查询参数
-
-**分页**：
-```
-?page=1&pageSize=20
-```
-
-**排序**：
-```
-?sortBy=createdAt&order=desc
-```
-
-**筛选**：
-```
-?status=completed
-?workflowId=deploy-workflow
-?startTime=2024-01-01&endTime=2024-12-31
-```
-
-**搜索**：
-```
-?search=keyword
-```
-
-## 数据存储选型
-
-### 方案1: MongoDB
-
-**优势**：
-- 文档模型适合嵌套数据
-- 灵活的Schema
-- 良好的查询性能
-- 支持聚合管道
-
-**适用场景**：
-- 数据结构变化频繁
-- 需要灵活查询
-- 数据量中等
-
-### 方案2: PostgreSQL
-
-**优势**：
-- 强大的关系查询
-- JSONB支持
-- 事务保证
-- 成熟稳定
-
-**适用场景**：
-- 需要复杂关联查询
-- 数据一致性要求高
-- 需要事务支持
-
-### 方案3: 时序数据库（InfluxDB/TimescaleDB）
-
-**优势**：
-- 针对时序数据优化
-- 高效的时间范围查询
-- 自动数据压缩
-- 聚合性能好
-
-**适用场景**：
-- 大量时序数据
-- 主要按时间查询
-- 需要高性能聚合
 
 ## 性能优化
 
 ### 1. 索引策略
 
-**MongoDB索引**：
-```javascript
-// Run集合
-db.runs.createIndex({ id: 1 }, { unique: true })
-db.runs.createIndex({ workflowId: 1, createdAt: -1 })
-db.runs.createIndex({ status: 1, createdAt: -1 })
+所有查询都基于上述索引设计,确保高效的查询性能。
 
-// Task集合
-db.tasks.createIndex({ id: 1 }, { unique: true })
-db.tasks.createIndex({ runId: 1, createdAt: -1 })
-db.tasks.createIndex({ status: 1 })
-
-// Request集合
-db.requests.createIndex({ id: 1 }, { unique: true })
-db.requests.createIndex({ taskId: 1, createdAt: -1 })
-db.requests.createIndex({ runId: 1 })
-```
-
-### 2. 缓存策略
-
-**热数据缓存**：
-- 最近的Run数据缓存到Redis
-- TTL: 1小时
-- 缓存Key: `data:run:{id}`
-
-**统计数据缓存**：
-- 统计结果缓存
-- TTL: 5分钟
-- 缓存Key: `data:stats:{type}:{params}`
-
-### 3. 查询优化
+### 2. 查询优化
 
 **分页优化**：
 - 使用游标分页代替offset
-- 限制最大pageSize
+- 限制最大pageSize为100
 
 **聚合优化**：
-- 使用数据库聚合功能
+- 使用MongoDB聚合管道
 - 预计算常用统计指标
-
-**关联查询优化**：
-- 适当使用数据冗余
-- 减少多表join
 
 ## 数据一致性
 
-### 事件顺序保证
-
-**问题**：网络延迟可能导致事件乱序
-
-**解决方案**：
-1. 使用timestamp排序事件
-2. 延迟处理机制（等待乱序事件）
-3. 版本号机制（检测冲突）
-
 ### 幂等性保证
 
-**问题**：重复事件可能导致数据重复
+**request.sent事件**：
+- 使用insertOne操作
+- 如果requestId已存在会抛出重复键错误
+- 客户端可以安全重试
 
-**解决方案**：
-1. 使用事件ID去重
-2. 更新操作使用upsert
-3. 状态机验证（只允许合法状态转换）
-
-### 数据修复
-
-**定期对账**：
-- 定期从Engine同步完整数据
-- 检测并修复不一致
-
-**手动修复**：
-- 提供Admin API手动触发同步
-- 支持重放事件
+**request.void和response.received事件**：
+- 使用updateOne操作
+- 重复更新不会导致数据错误
+- 保持最终一致性
 
 ## 关键设计
 
 ### 1. 事件驱动同步
-通过webhook事件实现数据同步，解耦Engine和Data服务。
+通过webhook事件实现请求数据同步，解耦Engine和Data服务。
 
-### 2. 最终一致性
-接受短暂的数据不一致，通过事件重放和对账保证最终一致。
+### 2. 专注请求管理
+只管理HTTP请求数据，不处理Run和Task数据，保持服务职责单一。
 
-### 3. 读写分离
-写入通过webhook异步处理，读取提供高性能查询API。
+### 3. 最终一致性
+接受短暂的数据不一致，通过幂等性设计保证最终一致。
 
-### 4. 多级缓存
-热数据缓存到Redis，减少数据库压力。
-
-### 5. 灵活存储
-支持多种数据库选型，适应不同场景需求。
+### 4. 灵活查询
+支持多维度查询（runId、taskId、status、taskName等）。
 
 ## 技术栈
 
 - **框架**: Koa (koa-es-template)
 - **语言**: ES Modules
-- **数据库**: MongoDB / PostgreSQL / TimescaleDB（可选）
-- **缓存**: Redis (es-ioredis-url)
-- **ORM**: Mongoose / Sequelize（根据数据库选型）
+- **数据库**: MongoDB
+- **端口**: 4244
 
 ## 配置示例
 

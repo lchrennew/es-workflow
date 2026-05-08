@@ -1,0 +1,10 @@
+kind: trigger
+name: data-request-sent-trigger
+metadata:
+  title: Data request.sent 触发器
+spec:
+  sourceInterceptor: engine-webhook-filter
+  targetInterceptor: never-intercept
+  binding: data-webhook-binding
+  template: data-request-sent-template
+  targetSystem: data-webhook-api
